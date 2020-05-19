@@ -68,6 +68,7 @@ int init = 1;
 dl_matrix3du_t *image_motion = NULL;
 dl_matrix3du_t *rgb2gray(dl_matrix3du_t *img);
 
+/*
 #if CONFIG_ESP_FACE_DETECT_ENABLED
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
 static void rgb_print(dl_matrix3du_t *image_matrix, uint32_t color, const char *str)
@@ -137,7 +138,7 @@ static void draw_boxes(dl_matrix3du_t *image_matrix, box_array_t *boxes)
 }
 
 #endif
-
+*/
 
 static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_t len)
 {
@@ -185,18 +186,12 @@ static esp_err_t capture_handler(httpd_req_t *req)
     if (!detection_enabled || fb->width > 400)
     {
 #endif
-        size_t fb_len = 0;
-        if (fb->format == PIXFORMAT_JPEG)
-        {
-            fb_len = fb->len;
+        if (fb->format == PIXFORMAT_JPEG) {
             res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
-        }
-        else
-        {
+        } else {
             jpg_chunking_t jchunk = {req, 0};
             res = frame2jpg_cb(fb, 80, jpg_encode_stream, &jchunk) ? ESP_OK : ESP_FAIL;
             httpd_resp_send_chunk(req, NULL, 0);
-            fb_len = jchunk.len;
         }
         esp_camera_fb_return(fb);
         return res;
@@ -238,7 +233,9 @@ static esp_err_t capture_handler(httpd_req_t *req)
         if (!deflicker(image_gray->item, w, h)) 
             ESP_LOGW(TAG, "no deflicker!");
 
-        if (init) {       
+        if (init) {  
+            // Image motion is I_{t-1} which keep last frame and so allocate once
+            //  at start of motion detection     
             image_motion = dl_matrix3du_alloc(1, w, h, 1);    
             if(!image_motion) {
                 ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
@@ -248,12 +245,14 @@ static esp_err_t capture_handler(httpd_req_t *req)
             init = 0;
         }  
 
+        // # Optical flow with vector 
         if(!LK_optical_flow(image_gray->item, image_motion->item, vector, image_gray->w, image_gray->h)) {
             ESP_LOGE(TAG, "LK_optical_flow failed");
             res = ESP_FAIL;
         }
         memcpy(image_motion->item, image_gray->item, count);
 
+        // Convert vector magnitude2 to image grayscale
         float max = 0;
         int i;
         for(i = WINDOW/2, mv = &vector[0]; i < (w - WINDOW/2)*(h - WINDOW/2);
@@ -267,6 +266,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
             ++i, mv++, pim++) {
             *pim = (uint8_t)255.0 * (float)mv->mag2  / max;
         }
+        // # end of conversion into pim -> image_gray
         
         jpg_chunking_t jchunk = {req, 0};
         if (!fmt2jpg_cb(image_gray->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, jpg_encode_stream, &jchunk))
@@ -296,7 +296,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     dl_matrix3du_t *image_matrix = NULL;
     init = 1;
-    //dl_matrix3du_t *image_motion = NULL;
     dl_matrix3du_t *image_new =  NULL;    
     dl_matrix3du_t *image_gray =  NULL;
 #endif
@@ -354,8 +353,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
-                        esp_camera_fb_return(fb); fb = NULL;
                         image_resize_linear(image_new->item, image_matrix->item, w, h, 3, fb->width, fb->height);
+                        esp_camera_fb_return(fb); fb = NULL;
                         image_gray = rgb2gray(image_new);
                         dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new);
                         image_new = NULL;  image_matrix = NULL;
@@ -363,7 +362,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         if (!deflicker(image_gray->item, w, h)) 
                             ESP_LOGW(TAG, "no deflicker!");
 
-                        if (init) {       
+                        if (init || !image_motion) {
+                            //Keep last image in memory as image_motion = Image {t-1}       
                             image_motion = dl_matrix3du_alloc(1, w, h, 1);    
                             if(!image_motion) {
                                 ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
@@ -372,6 +372,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                             memcpy(image_motion->item, image_gray->item, count);
                             init = 0;
                         }  
+
                         if(!LK_optical_flow8(image_gray->item, image_motion->item, image_gray->item, image_gray->w, image_gray->h)) {
                             ESP_LOGE(TAG, "LK_optical_flow failed");
                             res = ESP_FAIL;
