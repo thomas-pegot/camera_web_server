@@ -26,7 +26,6 @@
 #include "motion.h"
 #include "deflicker.h"
 
-
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
 #define TAG ""
@@ -212,6 +211,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
     const int h = ratio * (float)fb->height;
     const int count = w * h ;
     dl_matrix3du_t *image_new = dl_matrix3du_alloc(1, w, h, 3);
+    dl_matrix3du_t *image_deflicker = dl_matrix3du_alloc(1, w, h, 1);
     vector = (MotionVector16_t*) calloc(count, sizeof(MotionVector16_t));
     if (!image_matrix || !image_new || !vector) {
         ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
@@ -230,7 +230,8 @@ static esp_err_t capture_handler(httpd_req_t *req)
         dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new);
         image_new = NULL;  image_matrix = NULL;
 
-        if (!deflicker(image_gray->item, w, h)) 
+        memcpy(image_deflicker->item, image_gray->item, count);
+        if (!deflicker(image_deflicker->item, w, h)) 
             ESP_LOGW(TAG, "no deflicker!");
 
         if (init) {  
@@ -246,7 +247,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
         }  
 
         // # Optical flow with vector 
-        if(!LK_optical_flow(image_gray->item, image_motion->item, vector, image_gray->w, image_gray->h)) {
+        if(!LK_optical_flow(image_deflicker->item, image_motion->item, vector, image_gray->w, image_gray->h)) {
             ESP_LOGE(TAG, "LK_optical_flow failed");
             res = ESP_FAIL;
         }
@@ -261,7 +262,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
                 max = mv->mag2;
         }
         
-        for(i = WINDOW/2, pim = &image_gray->item[0], mv = &vector[0];
+        for(i = WINDOW/2, pim = &image_deflicker->item[0], mv = &vector[0];
             i < (w - WINDOW/2)*(h - WINDOW/2);
             ++i, mv++, pim++) {
             *pim = (uint8_t)255.0 * (float)mv->mag2  / max;
@@ -269,7 +270,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
         // # end of conversion into pim -> image_gray
         
         jpg_chunking_t jchunk = {req, 0};
-        if (!fmt2jpg_cb(image_gray->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, jpg_encode_stream, &jchunk))
+        if (!fmt2jpg_cb(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, jpg_encode_stream, &jchunk))
         {
             ESP_LOGE(TAG, "JPEG compression failed");
             res = ESP_FAIL;
@@ -277,7 +278,8 @@ static esp_err_t capture_handler(httpd_req_t *req)
         
     }
 
-    dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); dl_matrix3du_free(image_gray); 
+    dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
+    dl_matrix3du_free(image_gray); dl_matrix3du_free(image_deflicker);
     free(vector); 
 // END OF MY CODE
 
@@ -298,6 +300,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     init = 1;
     dl_matrix3du_t *image_new =  NULL;    
     dl_matrix3du_t *image_gray =  NULL;
+    dl_matrix3du_t *image_deflicker = NULL;
 #endif
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK)
@@ -344,25 +347,26 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 const int h = ratio * (float)fb->height;
                 const int count = w * h ;
                 image_new = dl_matrix3du_alloc(1, w, h, 3);
+                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);
                 image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-                if (!image_matrix || !image_new) {
+                if (!image_matrix || !image_new || !image_deflicker) {
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
                     res = ESP_FAIL;
                 } else {
-                    if(!fmt2rgb888(fb->buf, fb->len, fb->format, image_matrix->item)){
+                    if(!fmt2rgb888((const uint8_t *)fb->buf, (size_t)fb->len, PIXFORMAT_JPEG, image_matrix->item)){
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
                         image_resize_linear(image_new->item, image_matrix->item, w, h, 3, fb->width, fb->height);
-                        esp_camera_fb_return(fb); fb = NULL;
                         image_gray = rgb2gray(image_new);
                         dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new);
                         image_new = NULL;  image_matrix = NULL;
 
-                        if (!deflicker(image_gray->item, w, h)) 
+                        memcpy(image_deflicker->item, image_gray->item, count);
+                        if (!deflicker(image_deflicker->item, w, h)) 
                             ESP_LOGW(TAG, "no deflicker!");
 
-                        if (init || !image_motion) {
+                        if (init) {
                             //Keep last image in memory as image_motion = Image {t-1}       
                             image_motion = dl_matrix3du_alloc(1, w, h, 1);    
                             if(!image_motion) {
@@ -373,20 +377,24 @@ static esp_err_t stream_handler(httpd_req_t *req)
                             init = 0;
                         }  
 
-                        if(!LK_optical_flow8(image_gray->item, image_motion->item, image_gray->item, image_gray->w, image_gray->h)) {
+                        if(!LK_optical_flow8(image_deflicker->item, image_motion->item, image_deflicker->item,\
+                                            image_deflicker->w, image_deflicker->h)) {
                             ESP_LOGE(TAG, "LK_optical_flow failed");
                             res = ESP_FAIL;
                         }
-                        if (!fmt2jpg(image_gray->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
+
+                        if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
                             ESP_LOGE(TAG, "fmt2jpg failed");
 
                         
                         memcpy(image_motion->item, image_gray->item, count);
                     }
+                    esp_camera_fb_return(fb); fb = NULL;
                 }
 
-                dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); dl_matrix3du_free(image_gray); 
-                image_new = NULL;  image_matrix = NULL; image_gray = NULL; 
+                dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
+                dl_matrix3du_free(image_gray); dl_matrix3du_free(image_deflicker);
+                image_new = NULL;  image_matrix = NULL; image_gray = NULL; image_deflicker = NULL;
             }
             
 #endif
