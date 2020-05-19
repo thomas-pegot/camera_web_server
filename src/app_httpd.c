@@ -64,7 +64,9 @@ static int8_t detection_enabled = 0;
 #endif
 
 int init = 1;
+int wdt_safety_cnt = 0;
 dl_matrix3du_t *image_motion = NULL;
+dl_matrix3du_t *image_deflicker = NULL;
 dl_matrix3du_t *rgb2gray(dl_matrix3du_t *img);
 
 /*
@@ -300,14 +302,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
     init = 1;
     dl_matrix3du_t *image_new =  NULL;    
     dl_matrix3du_t *image_gray =  NULL;
-    dl_matrix3du_t *image_deflicker = NULL;
 #endif
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK)
         return res;
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "X-Framerate", "60");
+    httpd_resp_set_hdr(req, "X-Framerate", "10");
 
     while (true)
     {
@@ -347,54 +348,73 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 const int h = ratio * (float)fb->height;
                 const int count = w * h ;
                 image_new = dl_matrix3du_alloc(1, w, h, 3);
-                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);
                 image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-                if (!image_matrix || !image_new || !image_deflicker) {
+                if (!image_matrix || !image_new ) {
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
                     res = ESP_FAIL;
                 } else {
-                    if(!fmt2rgb888((const uint8_t *)fb->buf, (size_t)fb->len, PIXFORMAT_JPEG, image_matrix->item)){
+                    if(!fmt2rgb888((const uint8_t *)fb->buf, (size_t)fb->len, fb->format, image_matrix->item)){
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
-                        image_resize_linear(image_new->item, image_matrix->item, w, h, 3, fb->width, fb->height);
-                        image_gray = rgb2gray(image_new);
-                        dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new);
-                        image_new = NULL;  image_matrix = NULL;
+                        if( (wdt_safety_cnt > 4 ) && (fb->format == PIXFORMAT_JPEG) && image_deflicker) {
+                            // Trick to avoid triggering watchdog but need to change in futur
+                            wdt_safety_cnt = 0;
+                            if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
+                                ESP_LOGE(TAG, "fmt2jpg failed");
+                        } else {    
+                            wdt_safety_cnt++;
+                            image_resize_linear(image_new->item, image_matrix->item, w, h, 3, fb->width, fb->height);
+                            image_gray = rgb2gray(image_new);
+                            dl_matrix3du_free(image_matrix); image_matrix = NULL;
+                            dl_matrix3du_free(image_new); image_new = NULL;  
 
-                        memcpy(image_deflicker->item, image_gray->item, count);
-                        if (!deflicker(image_deflicker->item, w, h)) 
-                            ESP_LOGW(TAG, "no deflicker!");
+                            if (init) {
+                                //Keep last image in memory as image_motion = Image {t-1}   
+                                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);    
+                                image_motion = dl_matrix3du_alloc(1, w, h, 1);    
+                                if(!image_motion || !image_deflicker) {
+                                    ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
+                                    res = ESP_FAIL;
+                                }        
+                                memcpy(image_motion->item, image_gray->item, count);
+                                init = 0;
+                            }  
+                            
+                            memcpy(image_deflicker->item, image_gray->item, count);
+                            if (!deflicker(image_deflicker->item, w, h)) 
+                                ESP_LOGW(TAG, "no deflicker!");
 
-                        if (init) {
-                            //Keep last image in memory as image_motion = Image {t-1}       
-                            image_motion = dl_matrix3du_alloc(1, w, h, 1);    
-                            if(!image_motion) {
-                                ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
+                            if (init) {
+                                //Keep last image in memory as image_motion = Image {t-1}   
+                                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);    
+                                image_motion = dl_matrix3du_alloc(1, w, h, 1);    
+                                if(!image_motion || !image_deflicker) {
+                                    ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
+                                    res = ESP_FAIL;
+                                }        
+                                memcpy(image_motion->item, image_gray->item, count);
+                                init = 0;
+                            }  
+
+                            if(!LK_optical_flow8(image_deflicker->item, image_motion->item, image_deflicker->item,\
+                                                image_deflicker->w, image_deflicker->h)) {
+                                ESP_LOGE(TAG, "LK_optical_flow failed");
                                 res = ESP_FAIL;
-                            }        
+                            }
+
+                            if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
+                                ESP_LOGE(TAG, "fmt2jpg failed");
+
+                            esp_camera_fb_return(fb); fb = NULL;
                             memcpy(image_motion->item, image_gray->item, count);
-                            init = 0;
-                        }  
-
-                        if(!LK_optical_flow8(image_deflicker->item, image_motion->item, image_deflicker->item,\
-                                            image_deflicker->w, image_deflicker->h)) {
-                            ESP_LOGE(TAG, "LK_optical_flow failed");
-                            res = ESP_FAIL;
                         }
-
-                        if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
-                            ESP_LOGE(TAG, "fmt2jpg failed");
-
-                        
-                        memcpy(image_motion->item, image_gray->item, count);
                     }
-                    esp_camera_fb_return(fb); fb = NULL;
                 }
 
                 dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
-                dl_matrix3du_free(image_gray); dl_matrix3du_free(image_deflicker);
-                image_new = NULL;  image_matrix = NULL; image_gray = NULL; image_deflicker = NULL;
+                dl_matrix3du_free(image_gray); 
+                image_new = NULL;  image_matrix = NULL; image_gray = NULL; 
             }
             
 #endif
