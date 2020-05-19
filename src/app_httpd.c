@@ -63,6 +63,10 @@ httpd_handle_t camera_httpd = NULL;
 static int8_t detection_enabled = 0;
 #endif
 
+#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
+static int8_t recognition_enabled = 0;
+#endif
+
 int init = 1;
 int wdt_safety_cnt = 0;
 dl_matrix3du_t *image_motion = NULL;
@@ -233,8 +237,12 @@ static esp_err_t capture_handler(httpd_req_t *req)
         image_new = NULL;  image_matrix = NULL;
 
         memcpy(image_deflicker->item, image_gray->item, count);
-        if (!deflicker(image_deflicker->item, w, h)) 
-            ESP_LOGW(TAG, "no deflicker!");
+#if CONFIG_ESP_FACE_RECOGNITION_ENABLED   // Button deflicker is bind tp face recog.
+        if(recognition_enabled) {
+            if (!deflicker(image_deflicker->item, w, h)) 
+                ESP_LOGW(TAG, "no deflicker!");
+        }
+#endif
 
         if (init) {  
             // Image motion is I_{t-1} which keep last frame and so allocate once
@@ -382,8 +390,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
                             }  
                             
                             memcpy(image_deflicker->item, image_gray->item, count);
-                            if (!deflicker(image_deflicker->item, w, h)) 
-                                ESP_LOGW(TAG, "no deflicker!");
+#if CONFIG_ESP_FACE_RECOGNITION_ENABLED   // Button deflicker is bind tp face recog.
+                            if(recognition_enabled) {
+                                if (!deflicker(image_deflicker->item, w, h)) 
+                                    ESP_LOGW(TAG, "no deflicker!");
+                            }
+#endif
 
                             if (init) {
                                 //Keep last image in memory as image_motion = Image {t-1}   
@@ -542,8 +554,22 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         res = s->set_ae_level(s, val);
 
 #if CONFIG_ESP_FACE_DETECT_ENABLED
-    else if (!strcmp(variable, "face_detect")) 
+    else if (!strcmp(variable, "face_detect")) {
         detection_enabled = val;
+#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
+        if (!detection_enabled) {
+            recognition_enabled = 0;
+        }
+#endif
+    }
+#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
+    else if (!strcmp(variable, "face_recognize")) {
+        recognition_enabled = val;
+        if (recognition_enabled) {
+            detection_enabled = val;
+        }
+    }
+#endif
 #endif
     else {
         res = -1;
@@ -556,6 +582,8 @@ static esp_err_t cmd_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, NULL, 0);
 }
+
+
 
 static int print_reg(char * p, sensor_t * s, uint16_t reg, uint32_t mask){
     return sprintf(p, "\"0x%x\":%u,", reg, s->get_reg(s, reg, mask));
