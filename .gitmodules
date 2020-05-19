@@ -1,0 +1,3 @@
+[submodule "components/esp32-motion"]
+	path = components/esp32-motion
+	url = https://github.com/thomas-pegot/esp32-motion
