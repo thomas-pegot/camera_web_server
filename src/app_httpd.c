@@ -395,11 +395,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
-                        if( (wdt_safety_cnt > 2 ) && image_rainbow) {
+                        if( (wdt_safety_cnt > 4 ) && image_rainbow) {
                             // Trick to avoid triggering watchdog but need to change in futur
                             wdt_safety_cnt = 0;
-                            if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
-                                ESP_LOGE(TAG, "fmt2jpg failed");
+                            _jpg_buf_len = fb->len;
+                            _jpg_buf = fb->buf;     
+                            //if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                            //    ESP_LOGE(TAG, "fmt2jpg failed");
                         } else {    
                             wdt_safety_cnt++;
                             image_new = dl_matrix3du_alloc(1, w, h, 3);
@@ -462,7 +464,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 }
 
                 dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
-                dl_matrix3du_free(image_gray); free(vector);
+                dl_matrix3du_free(image_gray);  
+                free(vector);
                 image_new = NULL;  image_matrix = NULL; image_gray = NULL;  vector = NULL;
             }
             
