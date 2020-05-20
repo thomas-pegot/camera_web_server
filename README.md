@@ -4,6 +4,7 @@ Camera webserver esp32 with motion library.
 
 
 ![Demo motion](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/video_presentation.gif)
+![rainbow](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/rainbow.png)
 
 # Preparation
 
