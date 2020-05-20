@@ -25,6 +25,7 @@
 #include "image_util.h"
 #include "motion.h"
 #include "deflicker.h"
+#include "math.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -70,7 +71,7 @@ static int8_t recognition_enabled = 0;
 int init = 1;
 int wdt_safety_cnt = 0;
 dl_matrix3du_t *image_motion = NULL;
-dl_matrix3du_t *image_deflicker = NULL;
+uint8_t *image_rainbow = NULL;
 dl_matrix3du_t *rgb2gray(dl_matrix3du_t *img);
 
 /*
@@ -160,6 +161,35 @@ static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_
     return len;
 }
 
+// Increase grayscale range by converting into RGB rainbow color map 
+uint8_t *rainbow(MotionVector16_t *vec, float max, int len)
+{
+    uint8_t *rgb = (uint8_t*)malloc(len * 3);
+    MotionVector16_t *pvec = vec;
+    uint8_t *r = rgb;
+    uint8_t *g = r + 1;
+    uint8_t *b = r + 2;
+
+    for(int i = 0; i < len; i++, pvec++) {
+        const double a = (max > 0) ? 4.0 * pvec->mag2 / max : 0;
+        const int X = (int)floor(a);
+        const int Y = floor(255.0 * (a - X));
+        switch (X) {
+            case 0: *r = 255; *g = Y; *b = 0; break;
+            case 1: *r = 255 - Y; *g = 255; *b = 0; break;
+            case 2: *r = 0; *g = 255; *b = Y; break;
+            case 3: *r = 0; *g = 255 - Y; *b = 255; break;
+            case 4: *r = 0; *g = 0; *b = 255; break;
+            default: ESP_LOGW(TAG, "Impossiburu ! f = %f", a); break;
+        }
+        r += 3;
+        g += 3;
+        b += 3;
+    }
+    return rgb;
+}
+
+
 static esp_err_t capture_handler(httpd_req_t *req)
 {
     camera_fb_t *fb = NULL;
@@ -186,7 +216,6 @@ static esp_err_t capture_handler(httpd_req_t *req)
     dl_matrix3du_t *image_gray =  NULL;
     MotionVector16_t *vector = NULL;
     MotionVector16_t *mv = NULL;  //pointer to vector
-    uint8_t *pim = NULL; //pointer to vector->mag2
 
     if (!detection_enabled || fb->width > 400)
     {
@@ -217,8 +246,8 @@ static esp_err_t capture_handler(httpd_req_t *req)
     const int h = ratio * (float)fb->height;
     const int count = w * h ;
     dl_matrix3du_t *image_new = dl_matrix3du_alloc(1, w, h, 3);
-    dl_matrix3du_t *image_deflicker = dl_matrix3du_alloc(1, w, h, 1);
     vector = (MotionVector16_t*) calloc(count, sizeof(MotionVector16_t));
+    
     if (!image_matrix || !image_new || !vector) {
         ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
         res = ESP_FAIL;
@@ -236,10 +265,9 @@ static esp_err_t capture_handler(httpd_req_t *req)
         dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new);
         image_new = NULL;  image_matrix = NULL;
 
-        memcpy(image_deflicker->item, image_gray->item, count);
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED   // Button deflicker is bind tp face recog.
         if(recognition_enabled) {
-            if (!deflicker(image_deflicker->item, w, h)) 
+            if (!deflicker(image_gray->item, w, h)) 
                 ESP_LOGW(TAG, "no deflicker!");
         }
 #endif
@@ -257,30 +285,30 @@ static esp_err_t capture_handler(httpd_req_t *req)
         }  
 
         // # Optical flow with vector 
-        if(!LK_optical_flow(image_deflicker->item, image_motion->item, vector, image_gray->w, image_gray->h)) {
+        if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h)) {
             ESP_LOGE(TAG, "LK_optical_flow failed");
             res = ESP_FAIL;
         }
         memcpy(image_motion->item, image_gray->item, count);
 
-        // Convert vector magnitude2 to image grayscale
+        // # Convert vector magnitude2 to image grayscale
         float max = 0;
         int i;
-        for(i = WINDOW/2, mv = &vector[0]; i < (w - WINDOW/2)*(h - WINDOW/2);
-                    ++i, mv++) {
-            if (mv->mag2 > max)
-                max = mv->mag2;
+        int half_window = (int)WINDOW / 2.0;
+        mv = &vector[half_window * w + half_window];
+        for(i = h - WINDOW; i--; ) {
+            for(int j = half_window; j < w - half_window; j++, mv++) {
+                if (mv->mag2 > max) 
+                    max = mv->mag2;
+            }
+            mv += WINDOW;
         }
-        
-        for(i = WINDOW/2, pim = &image_deflicker->item[0], mv = &vector[0];
-            i < (w - WINDOW/2)*(h - WINDOW/2);
-            ++i, mv++, pim++) {
-            *pim = (uint8_t)255.0 * (float)mv->mag2  / max;
-        }
+        if(image_rainbow) free(image_rainbow);
+        image_rainbow = rainbow(vector, max, count);
         // # end of conversion into pim -> image_gray
         
         jpg_chunking_t jchunk = {req, 0};
-        if (!fmt2jpg_cb(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, jpg_encode_stream, &jchunk))
+        if (!fmt2jpg_cb(image_rainbow, count * 3, w, h, PIXFORMAT_RGB888, 90, jpg_encode_stream, &jchunk))
         {
             ESP_LOGE(TAG, "JPEG compression failed");
             res = ESP_FAIL;
@@ -289,7 +317,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
     }
 
     dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
-    dl_matrix3du_free(image_gray); dl_matrix3du_free(image_deflicker);
+    dl_matrix3du_free(image_gray); 
     free(vector); 
 // END OF MY CODE
 
@@ -308,9 +336,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     dl_matrix3du_t *image_matrix = NULL;
     init = 1;
-    dl_matrix3du_t *image_new =  NULL;    
+    dl_matrix3du_t *image_new =  NULL;   
+    MotionVector16_t *vector = NULL; 
     dl_matrix3du_t *image_gray =  NULL;
+    MotionVector16_t *mv = NULL;  //pointer to vector
 #endif
+    ESP_LOGI(TAG, "RAM : %u", (short)esp_get_free_heap_size());
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK)
         return res;
@@ -355,67 +386,68 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 const int w = ratio * (float)fb->width;
                 const int h = ratio * (float)fb->height;
                 const int count = w * h ;
-                image_new = dl_matrix3du_alloc(1, w, h, 3);
                 image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-                if (!image_matrix || !image_new ) {
+                if (!image_matrix) {
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
                     res = ESP_FAIL;
                 } else {
-                    if(!fmt2rgb888((const uint8_t *)fb->buf, (size_t)fb->len, fb->format, image_matrix->item)){
+                    if(!fmt2rgb888((const uint8_t *)fb->buf, fb->len, fb->format, image_matrix->item)){
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
-                        if( (wdt_safety_cnt > 4 ) && (fb->format == PIXFORMAT_JPEG) && image_deflicker) {
+                        if( (wdt_safety_cnt > 4 ) && image_rainbow) {
                             // Trick to avoid triggering watchdog but need to change in futur
                             wdt_safety_cnt = 0;
-                            if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
+                            if (!fmt2jpg(image_rainbow, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
                                 ESP_LOGE(TAG, "fmt2jpg failed");
                         } else {    
                             wdt_safety_cnt++;
+                            image_new = dl_matrix3du_alloc(1, w, h, 3);
+                            vector = (MotionVector16_t*) calloc(count, sizeof(MotionVector16_t));
+                            if (!image_new || !vector) {
+                                ESP_LOGE(TAG,"fmt2rgb888 failed");
+                                res = ESP_FAIL;           
+                            }
                             image_resize_linear(image_new->item, image_matrix->item, w, h, 3, fb->width, fb->height);
                             image_gray = rgb2gray(image_new);
                             dl_matrix3du_free(image_matrix); image_matrix = NULL;
                             dl_matrix3du_free(image_new); image_new = NULL;  
-
-                            if (init) {
-                                //Keep last image in memory as image_motion = Image {t-1}   
-                                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);    
-                                image_motion = dl_matrix3du_alloc(1, w, h, 1);    
-                                if(!image_motion || !image_deflicker) {
-                                    ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
-                                    res = ESP_FAIL;
-                                }        
-                                memcpy(image_motion->item, image_gray->item, count);
-                                init = 0;
-                            }  
-                            
-                            memcpy(image_deflicker->item, image_gray->item, count);
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED   // Button deflicker is bind tp face recog.
                             if(recognition_enabled) {
-                                if (!deflicker(image_deflicker->item, w, h)) 
+                                if (!deflicker(image_gray->item, w, h)) 
                                     ESP_LOGW(TAG, "no deflicker!");
                             }
 #endif
-
                             if (init) {
-                                //Keep last image in memory as image_motion = Image {t-1}   
-                                image_deflicker = dl_matrix3du_alloc(1, w, h, 1);    
+                                //Keep last image in memory as image_motion = Image {t-1} 
                                 image_motion = dl_matrix3du_alloc(1, w, h, 1);    
-                                if(!image_motion || !image_deflicker) {
+                                if(!image_motion) {
                                     ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
                                     res = ESP_FAIL;
                                 }        
                                 memcpy(image_motion->item, image_gray->item, count);
                                 init = 0;
-                            }  
-
-                            if(!LK_optical_flow8(image_deflicker->item, image_motion->item, image_deflicker->item,\
-                                                image_deflicker->w, image_deflicker->h)) {
+                            } else if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h)) {
                                 ESP_LOGE(TAG, "LK_optical_flow failed");
                                 res = ESP_FAIL;
                             }
 
-                            if (!fmt2jpg(image_deflicker->item, count, w, h, PIXFORMAT_GRAYSCALE, 90, &_jpg_buf, &_jpg_buf_len))
+                            // # Convert vector magnitude2 to image grayscale
+                            float max = 0;
+                            int half_window = WINDOW >> 1;
+                            mv = &vector[half_window * w + half_window];
+                            for(int i = h - WINDOW; i--; ) {
+                                for(int j = half_window; j < w - half_window; j++, mv++) {
+                                    if (mv->mag2 > max) 
+                                        max = mv->mag2;
+                                }
+                                mv += WINDOW;
+                            }
+
+                            if(image_rainbow) free(image_rainbow);
+                            image_rainbow = rainbow(vector, max, count);
+
+                            if (!fmt2jpg(image_rainbow, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
                                 ESP_LOGE(TAG, "fmt2jpg failed");
 
                             esp_camera_fb_return(fb); fb = NULL;
