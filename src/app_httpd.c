@@ -71,10 +71,10 @@ static int8_t recognition_enabled = 0;
 int init = 1;
 int wdt_safety_cnt = 0;
 dl_matrix3du_t *image_motion = NULL;
-uint8_t *image_rainbow = NULL;
+dl_matrix3du_t *image_rainbow = NULL;
 dl_matrix3du_t *rgb2gray(dl_matrix3du_t *img);
 
-/*
+
 #if CONFIG_ESP_FACE_DETECT_ENABLED
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
 static void rgb_print(dl_matrix3du_t *image_matrix, uint32_t color, const char *str)
@@ -117,7 +117,7 @@ static int rgb_printf(dl_matrix3du_t *image_matrix, uint32_t color, const char *
     return len;
 }
 #endif
-
+/*
 static void draw_boxes(dl_matrix3du_t *image_matrix, box_array_t *boxes)
 {
     int x, y, w, h, i;
@@ -141,10 +141,10 @@ static void draw_boxes(dl_matrix3du_t *image_matrix, box_array_t *boxes)
         fb_gfx_drawFastVLine(&fb, x, y, h, color);
         fb_gfx_drawFastVLine(&fb, x + w - 1, y, h, color);
     }
-}
+}*/
 
 #endif
-*/
+
 
 static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_t len)
 {
@@ -162,11 +162,12 @@ static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_
 }
 
 // Increase grayscale range by converting into RGB rainbow color map 
-uint8_t *rainbow(MotionVector16_t *vec, float max, int len)
+dl_matrix3du_t *rainbow(MotionVector16_t *vec, float max, int w, int h)
 {
-    uint8_t *rgb = (uint8_t*)malloc(len * 3);
+    dl_matrix3du_t *rgb = dl_matrix3du_alloc(1, w, h, 3);
     MotionVector16_t *pvec = vec;
-    uint8_t *r = rgb;
+    int len = w*h;
+    uint8_t *r = rgb->item;
     uint8_t *g = r + 1;
     uint8_t *b = r + 2;
 
@@ -298,17 +299,17 @@ static esp_err_t capture_handler(httpd_req_t *req)
         mv = &vector[half_window * w + half_window];
         for(i = h - WINDOW; i--; ) {
             for(int j = half_window; j < w - half_window; j++, mv++) {
-                if (mv->mag2 > max) 
+                if (mv->mag2 > max)  
                     max = mv->mag2;
             }
             mv += WINDOW;
         }
-        if(image_rainbow) free(image_rainbow);
-        image_rainbow = rainbow(vector, max, count);
+        if(image_rainbow) dl_matrix3du_free(image_rainbow);
+        image_rainbow = rainbow(vector, max, w, h);
         // # end of conversion into pim -> image_gray
         
         jpg_chunking_t jchunk = {req, 0};
-        if (!fmt2jpg_cb(image_rainbow, count * 3, w, h, PIXFORMAT_RGB888, 90, jpg_encode_stream, &jchunk))
+        if (!fmt2jpg_cb(image_rainbow->item, count * 3, w, h, PIXFORMAT_RGB888, 90, jpg_encode_stream, &jchunk))
         {
             ESP_LOGE(TAG, "JPEG compression failed");
             res = ESP_FAIL;
@@ -341,7 +342,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
     dl_matrix3du_t *image_gray =  NULL;
     MotionVector16_t *mv = NULL;  //pointer to vector
 #endif
-    ESP_LOGI(TAG, "RAM : %u", (short)esp_get_free_heap_size());
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK)
         return res;
@@ -382,7 +382,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 }
 #if CONFIG_ESP_FACE_DETECT_ENABLED
             }else {           
-                const float ratio = 96.0 / (float)fb->width ;
+                const float ratio = 120.0 / (float)fb->width ;
                 const int w = ratio * (float)fb->width;
                 const int h = ratio * (float)fb->height;
                 const int count = w * h ;
@@ -395,10 +395,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         ESP_LOGE(TAG,"fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
-                        if( (wdt_safety_cnt > 4 ) && image_rainbow) {
+                        if( (wdt_safety_cnt > 2 ) && image_rainbow) {
                             // Trick to avoid triggering watchdog but need to change in futur
                             wdt_safety_cnt = 0;
-                            if (!fmt2jpg(image_rainbow, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                            if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
                                 ESP_LOGE(TAG, "fmt2jpg failed");
                         } else {    
                             wdt_safety_cnt++;
@@ -425,7 +425,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                                     ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
                                     res = ESP_FAIL;
                                 }        
-                                memcpy(image_motion->item, image_gray->item, count);
+                                //memcpy(image_motion->item, image_gray->item, count);
                                 init = 0;
                             } else if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h)) {
                                 ESP_LOGE(TAG, "LK_optical_flow failed");
@@ -433,21 +433,26 @@ static esp_err_t stream_handler(httpd_req_t *req)
                             }
 
                             // # Convert vector magnitude2 to image grayscale
-                            float max = 0;
+                            float max = 0, mean = 0;
                             int half_window = WINDOW >> 1;
                             mv = &vector[half_window * w + half_window];
                             for(int i = h - WINDOW; i--; ) {
                                 for(int j = half_window; j < w - half_window; j++, mv++) {
                                     if (mv->mag2 > max) 
                                         max = mv->mag2;
+                                    mean += mv->mag2;
                                 }
                                 mv += WINDOW;
                             }
+                            mean = mean / (float)(h - WINDOW) / (float)(w - WINDOW);
 
-                            if(image_rainbow) free(image_rainbow);
-                            image_rainbow = rainbow(vector, max, count);
+                            if(image_rainbow) dl_matrix3du_free(image_rainbow);
+                            image_rainbow = rainbow(vector, max, w, h);
 
-                            if (!fmt2jpg(image_rainbow, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                            int len = rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean);
+                            if(!len) ESP_LOGW(TAG, "rgbprintf error!");
+
+                            if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
                                 ESP_LOGE(TAG, "fmt2jpg failed");
 
                             esp_camera_fb_return(fb); fb = NULL;
@@ -457,10 +462,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 }
 
                 dl_matrix3du_free(image_matrix); dl_matrix3du_free(image_new); 
-                dl_matrix3du_free(image_gray); 
-                image_new = NULL;  image_matrix = NULL; image_gray = NULL; 
+                dl_matrix3du_free(image_gray); free(vector);
+                image_new = NULL;  image_matrix = NULL; image_gray = NULL;  vector = NULL;
             }
             
+    //ESP_LOGI(TAG, "free heap : %u", (short)esp_get_free_heap_size());
 #endif
         }
         if (res == ESP_OK) {
