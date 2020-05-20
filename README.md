@@ -27,11 +27,6 @@ t. **View The Stream**  in a player like VLC: Open Network `http://[ip-of-esp32]
 For more details of the http handler, please refer to [esp32-camera](https://github.com/espressif/esp32-camera).
 
 
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-Please make sure to update tests as appropriate.
-
 ## References
 
 This code is revisited from [https://github.com/espressif/esp-who](https://github.com/espressif/esp-who) .
