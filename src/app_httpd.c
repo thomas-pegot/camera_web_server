@@ -167,20 +167,21 @@ dl_matrix3du_t *rainbow(MotionVector16_t *vec, float max, int w, int h)
     dl_matrix3du_t *rgb = dl_matrix3du_alloc(1, w, h, 3);
     MotionVector16_t *pvec = vec;
     int len = w*h;
-    uint8_t *r = rgb->item;
-    uint8_t *g = r + 1;
-    uint8_t *b = r + 2;
+    uint8_t *b = rgb->item;
+    uint8_t *g = b + 1;
+    uint8_t *r = b + 2;
 
     for(int i = 0; i < len; i++, pvec++) {
-        const double a = (max > 0) ? 4.0 * pvec->mag2 / max : 0;
+        const double a = (max > 0) ? 5.0 * pvec->mag2 / max : 0;
         const int X = (int)floor(a);
         const int Y = floor(255.0 * (a - X));
         switch (X) {
-            case 0: *r = 255; *g = Y; *b = 0; break;
-            case 1: *r = 255 - Y; *g = 255; *b = 0; break;
-            case 2: *r = 0; *g = 255; *b = Y; break;
-            case 3: *r = 0; *g = 255 - Y; *b = 255; break;
-            case 4: *r = 0; *g = 0; *b = 255; break;
+            case 5: *r = 255; *g = Y; *b = 0; break;
+            case 4: *r = 255 - Y; *g = 255; *b = 0; break;
+            case 3: *r = 0; *g = 255; *b = Y; break;
+            case 2: *r = 0; *g = 255 - Y; *b = 255; break;
+            case 1: *r = 0; *g = 0; *b = 255 - Y; break;
+            case 0: *r = 0; *g = 0; *b = Y; break;          
             default: ESP_LOGW(TAG, "Impossiburu ! f = %f", a); break;
         }
         r += 3;
@@ -382,7 +383,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 }
 #if CONFIG_ESP_FACE_DETECT_ENABLED
             }else {           
-                const float ratio = 120.0 / (float)fb->width ;
+                const float ratio = 1.0;//120.0 / (float)fb->width ;
                 const int w = ratio * (float)fb->width;
                 const int h = ratio * (float)fb->height;
                 const int count = w * h ;
@@ -405,8 +406,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         } else {    
                             wdt_safety_cnt++;
                             image_new = dl_matrix3du_alloc(1, w, h, 3);
-                            vector = (MotionVector16_t*) calloc(count, sizeof(MotionVector16_t));
-                            if (!image_new || !vector) {
+                            //vector = (MotionVector16_t*) calloc(count, sizeof(MotionVector16_t));
+                            if (!image_new) {
                                 ESP_LOGE(TAG,"fmt2rgb888 failed");
                                 res = ESP_FAIL;           
                             }
@@ -420,6 +421,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                                     ESP_LOGW(TAG, "no deflicker!");
                             }
 #endif
+                            int64_t arps_start = esp_timer_get_time();
+                            const int blk_size = 8;
                             if (init) {
                                 //Keep last image in memory as image_motion = Image {t-1} 
                                 image_motion = dl_matrix3du_alloc(1, w, h, 1);    
@@ -427,14 +430,18 @@ static esp_err_t stream_handler(httpd_req_t *req)
                                     ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
                                     res = ESP_FAIL;
                                 }        
-                                //memcpy(image_motion->item, image_gray->item, count);
+                                memcpy(image_motion->item, image_gray->item, count);
                                 init = 0;
-                            } else if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h)) {
+                                continue;
+                            } else if(motionEstARPS(image_gray->item, image_motion->item, w, h, blk_size, 5, &vector, 128) < 0) {
+                            //else if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h)) {
                                 ESP_LOGE(TAG, "LK_optical_flow failed");
                                 res = ESP_FAIL;
                             }
-
+                            
+                            ESP_LOGI(TAG, "ARPS time : %u ms", (uint32_t) (esp_timer_get_time() - arps_start)/1000);
                             // # Convert vector magnitude2 to image grayscale
+                            /*
                             float max = 0, mean = 0;
                             int half_window = WINDOW >> 1;
                             mv = &vector[half_window * w + half_window];
@@ -446,17 +453,25 @@ static esp_err_t stream_handler(httpd_req_t *req)
                                 }
                                 mv += WINDOW;
                             }
-                            mean = mean / (float)(h - WINDOW) / (float)(w - WINDOW);
+                            mean = mean / (float)(h - WINDOW) / (float)(w - WINDOW);*/
+                            float max = 0, mean = 0;
+                            int const vec_width = w /blk_size, vec_height = h /blk_size;
+                            int const vec_size = vec_width * vec_height;
+                            mv = vector;
+                            for(int j = 0; j < vec_size; j++, mv++) {
+                                    if (mv->mag2 > max) 
+                                        max = mv->mag2;
+                                    mean += mv->mag2;
+                            }
+                            mean = mean / (float)(vec_size);
 
                             if(image_rainbow) dl_matrix3du_free(image_rainbow);
-                            image_rainbow = rainbow(vector, max, w, h);
+                            //image_rainbow = rainbow(vector, max, vec_width, vec_height);
+                            /*int len = rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean);
+                            if(!len) ESP_LOGW(TAG, "rgbprintf error!");*/
 
-                            int len = rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean);
-                            if(!len) ESP_LOGW(TAG, "rgbprintf error!");
-
-                            if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                            if (!fmt2jpg(image_rainbow->item, vec_size*3, vec_width, vec_height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
                                 ESP_LOGE(TAG, "fmt2jpg failed");
-
                             esp_camera_fb_return(fb); fb = NULL;
                             memcpy(image_motion->item, image_gray->item, count);
                         }

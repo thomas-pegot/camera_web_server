@@ -116,5 +116,6 @@ void app_camera_main ()
         s->set_saturation(s, -2);//lower the saturation
     }
     //drop down frame size for higher initial frame rate
-    //s->set_framesize(s, FRAMESIZE_HD);
+    //s->set_xclk(s, )
+    s->set_framesize(s, FRAMESIZE_240X240);
 }
