@@ -1,3 +1,4 @@
+const char* index_ov2640_html = R"~(
 <!doctype html>
 <html>
     <head>
@@ -1177,3 +1178,4 @@ document.addEventListener('DOMContentLoaded', function (event) {
         </script>
     </body>
 </html>
+)~";

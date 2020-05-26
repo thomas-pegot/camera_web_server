@@ -26,6 +26,7 @@
 #include "motion.h"
 #include "deflicker.h"
 #include "math.h"
+#include "camera_index.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -63,6 +64,8 @@ httpd_handle_t camera_httpd = NULL;
 #if CONFIG_ESP_FACE_DETECT_ENABLED
 static int8_t detection_enabled = 0;
 #endif
+
+static int8_t motion_type = 0;
 
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
 static int8_t recognition_enabled = 0;
@@ -400,9 +403,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                             // Trick to avoid triggering watchdog but need to change in futur
                             wdt_safety_cnt = 0;
                             _jpg_buf_len = fb->len;
-                            _jpg_buf = fb->buf;     
-                            //if (!fmt2jpg(image_rainbow->item, count*3, w, h, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
-                            //    ESP_LOGE(TAG, "fmt2jpg failed");
+                            _jpg_buf = fb->buf; 
                         } else {    
                             wdt_safety_cnt++;
                             image_new = dl_matrix3du_alloc(1, w, h, 3);
@@ -608,9 +609,14 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         res = s->set_wb_mode(s, val);
     else if (!strcmp(variable, "ae_level"))
         res = s->set_ae_level(s, val);
-
+    else if (!strcmp(variable, "motion_detect")) {
+        motion_type = val;
+        if(!motion_type) {
+            detection_enabled = 0;
+            recognition_enabled = 0;
+        }
 #if CONFIG_ESP_FACE_DETECT_ENABLED
-    else if (!strcmp(variable, "face_detect")) {
+    } else if (!strcmp(variable, "face_detect")) {
         detection_enabled = val;
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
         if (!detection_enabled) {
@@ -892,7 +898,7 @@ static esp_err_t win_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, NULL, 0);
 }
-
+/*
 static esp_err_t index_handler(httpd_req_t *req)
 {
     extern const unsigned char index_ov2640_html_gz_start[] asm("_binary_index_ov2640_html_gz_start");
@@ -922,6 +928,11 @@ static esp_err_t index_handler(httpd_req_t *req)
         ESP_LOGE(TAG, "Camera sensor not found");
         return httpd_resp_send_500(req);
     }
+}*/
+
+static esp_err_t index_handler(httpd_req_t *req){
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, index_ov2640_html, strlen(index_ov2640_html));
 }
 
 static esp_err_t monitor_handler(httpd_req_t *req)
