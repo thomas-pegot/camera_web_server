@@ -1122,10 +1122,10 @@ document.addEventListener('DOMContentLoaded', function (event) {
 
   motion_type.onchange = () => {
     updateConfig(motion_type)
-	if (motion_type.value < 1) {
-	  updateValue(detect, false);
-	  updateValue(recognize, false);
-	}
+    if (motion_type.value < 1) {
+      updateValue(detect, false);
+      updateValue(recognize, false);
+    }
   }
 
   framesize.onchange = () => {
@@ -1142,11 +1142,11 @@ document.addEventListener('DOMContentLoaded', function (event) {
       updateValue(detect, false)
       return;
     }
-	if (motion_type.value < 1) {
-	  alert("Please select a motion algorithm before. BITCH!");
+    if (motion_type.value < 1) {
+      alert("Please select a motion algorithm before. BITCH!");
       updateValue(detect, false)
       return;
-	}
+    }
     updateConfig(detect)
     if (!detect.checked) {
       disable(enrollButton)
@@ -1160,11 +1160,11 @@ document.addEventListener('DOMContentLoaded', function (event) {
       updateValue(recognize, false)
       return;
     }
-	if (motion_type.value < 1) {
-	  alert("Please select a motion algorithm before. BITCH!");
+    if (motion_type.value < 1) {
+      alert("Please select a motion algorithm before. BITCH!");
       updateValue(recognize, false)
       return;
-	}
+    }
     updateConfig(recognize)
     if (recognize.checked) {
       enable(enrollButton)
