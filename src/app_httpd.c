@@ -74,7 +74,7 @@ static int8_t recognition_enabled = 0;
 int init = 1;
 int wdt_safety_cnt = 0;
 dl_matrix3du_t *image_motion = NULL;
-dl_matrix3du_t *image_rainbow = NULL;
+dl_matrix3du_t *image_rainbow =  NULL;  
 MotionEstContext *me_c = NULL;
 
 dl_matrix3du_t *rgb2gray(dl_matrix3du_t *img);
@@ -182,13 +182,15 @@ dl_matrix3du_t *rainbow(MotionVector16_t *vec, float max, int w, int h)
         const int X = (int)floor(a);
         const int Y = floor(255.0 * (a - X));
         switch (X) {
+            case 7: *r = 255; *g = 0; *b = 0; break;
+            case 6: *r = 255; *g = 0; *b = 0; break;
             case 5: *r = 255; *g = Y; *b = 0; break;
             case 4: *r = 255 - Y; *g = 255; *b = 0; break;
             case 3: *r = 0; *g = 255; *b = Y; break;
             case 2: *r = 0; *g = 255 - Y; *b = 255; break;
             case 1: *r = 0; *g = 0; *b = 255 - Y; break;
             case 0: *r = 0; *g = 0; *b = Y; break;          
-            default: ESP_LOGW(TAG, "Impossiburu ! f = %f", a); break;
+            default: ESP_LOGW(TAG, "Poorly choosen max value ! f = %f", a); break;
         }
         r += 3;
         g += 3;
@@ -331,8 +333,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     char *part_buf[128];
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     dl_matrix3du_t *image_matrix = NULL;
-    init = 1;
-    //dl_matrix3du_t *image_new =  NULL;   
+    init = 1; 
     dl_matrix3du_t *image_gray =  NULL;
     MotionEstContext ctx;
 #endif
@@ -362,9 +363,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
             {
 #endif
                 init = 1;
-                dl_matrix3du_free(image_motion);
-                dl_matrix3du_free(image_rainbow);
-                image_rainbow = NULL;            
+                dl_matrix3du_free(image_motion);      
                 image_motion = NULL;
                 if(me_c != NULL) {
                     uninit(&ctx); 
@@ -383,85 +382,83 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     _jpg_buf = fb->buf;
                 }
 #if CONFIG_ESP_FACE_DETECT_ENABLED
-            }else {
+            }else if( (wdt_safety_cnt > 4 ) ) {
+                // Trick to avoid triggering watchdog but need to change in futur
+                (wdt_safety_cnt > 12) ? wdt_safety_cnt = 0 : wdt_safety_cnt++;
+                _jpg_buf_len = fb->len;
+                _jpg_buf = fb->buf;                         
+            } else {
                 const int w = fb->width, h = fb->height;           
                 const int count = fb->width * fb->height;
                 image_matrix = dl_matrix3du_alloc(1, w, h, 3);
                 if (!image_matrix) {
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
                     res = ESP_FAIL;
+                } else if(!fmt2rgb888(fb->buf, fb->len, fb->format, image_matrix->item)){
+                    ESP_LOGE(TAG,"fmt2rgb888 failed");
+                    res = ESP_FAIL;
                 } else {
-                    if(!fmt2rgb888((const uint8_t *)fb->buf, fb->len, fb->format, image_matrix->item)){
-                        ESP_LOGE(TAG,"fmt2rgb888 failed");
-                        res = ESP_FAIL;
-                    } else {
-                        if( (wdt_safety_cnt > 4 ) ) {
-                            // Trick to avoid triggering watchdog but need to change in futur
-                            wdt_safety_cnt = 0;
-                            _jpg_buf_len = fb->len;
-                            _jpg_buf = fb->buf; 
-                            ESP_LOGW(TAG, "heap : %u", (short)esp_get_free_heap_size());
-                        } else {    
-                            esp_camera_fb_return(fb); 
-                            fb = NULL;
-                            wdt_safety_cnt++;
-                            image_gray = rgb2gray(image_matrix);
-                            dl_matrix3du_free(image_matrix); image_matrix = NULL;
+                    wdt_safety_cnt++;
+                    image_gray = rgb2gray(image_matrix);
+                    dl_matrix3du_free(image_matrix); image_matrix = NULL;
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED   // Button deflicker is bind tp face recog.
-                            if(recognition_enabled) {
-                                if (!deflicker(image_gray->item, w, h)) 
-                                    ESP_LOGW(TAG, "no deflicker!");
-                            }
-#endif
-                            int64_t arps_start = esp_timer_get_time();
-
-                            //First time: init context and allocate image motion once
-                            if (init) {           
-                                me_c = &ctx;
-                                //allocate motion vect table
-                                if(motion_type == LK_OPTICAL_FLOW)
-                                    init_context(me_c, motion_type, 1, 6, w, h);
-                                else
-                                    init_context(me_c, motion_type, 8, 6, w, h);
-                                //Keep last image in memory as image_motion = Image {t-1} 
-                                image_motion = dl_matrix3du_alloc(1, w, h, 1);    
-                                if(!image_motion) {
-                                    ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
-                                    res = ESP_FAIL;
-                                }        
-                                memcpy(image_motion->item, image_gray->item, count);
-                                init = 0;
-                                continue;
-                            } else if(!motion_estimation(me_c, image_motion->item, image_gray->item)) {
-                                ESP_LOGE(TAG, "motion estimation failed");
-                                res = ESP_FAIL;
-                            }
-                            ESP_LOGI(TAG, "[%s] time : %u ms", &me_c->name[0], 
-                                    (uint32_t) (esp_timer_get_time() - arps_start)/1000);
-                            
-                            // extract max
-                            int const vec_width = me_c->b_width, vec_height = me_c->b_height;
-                            int const vec_size = me_c->b_count;
-                            const float mean = me_c->max / (float) me_c->b_count;
-
-                            // Convert 16bit grayscale -> rainbow  RGB
-                            if(image_rainbow) dl_matrix3du_free(image_rainbow);
-                            image_rainbow = rainbow(me_c->mv_table[0], me_c->max, vec_width, vec_height);
-                            if(!rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean))
-                                ESP_LOGW(TAG, "rgbprintf error!");
-                            // send rainbow to stream 
-                            if (!fmt2jpg(image_rainbow->item, vec_size*3, vec_width, vec_height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
-                                ESP_LOGE(TAG, "fmt2jpg failed");
-                            memcpy(image_motion->item, image_gray->item, count);
-                        }
+                    if(recognition_enabled) {
+                        if (!deflicker(image_gray->item, w, h)) 
+                            ESP_LOGW(TAG, "no deflicker!");
                     }
+#endif
+                    //First time: init context and allocate image motion once
+                    if (init) {    
+                        me_c = &ctx;     
+                        //allocate motion vect table
+                        if(motion_type == LK_OPTICAL_FLOW)
+                            init_context(me_c, motion_type, 1, 6, w, h);
+                        else {
+                            init_context(me_c, motion_type, (int)fb->width / 100, 6, w, h);
+                        }
+                        //Keep last image in memory as image_motion = Image {t-1} 
+                        image_motion = dl_matrix3du_alloc(1, w, h, 1);    
+                        if(!image_motion) {
+                            ESP_LOGE(TAG, "dl_matrix3du_alloc failed");
+                            res = ESP_FAIL;
+                        }        
+                        memcpy(image_motion->item, image_gray->item, count);
+                        init = 0;                        
+                        if (!fmt2jpg(image_motion->item, count, w, h, PIXFORMAT_GRAYSCALE, 80, &_jpg_buf, &_jpg_buf_len))
+                            ESP_LOGE(TAG, "fmt2jpg failed");
+                    } else if(!motion_estimation(me_c, image_motion->item, image_gray->item)) {
+                        ESP_LOGE(TAG, "motion estimation failed");
+                        res = ESP_FAIL;
+                    } else { // motion estimate don't fail and not initialisation
+                        int64_t arps_start = esp_timer_get_time();
+                        ESP_LOGI(TAG, "[%s] time: %u ms   max: %u  || heap free: %u", &me_c->name[0],  
+                            (uint32_t)(esp_timer_get_time() - arps_start)/1000, me_c->max, (short)esp_get_free_heap_size());                             
+                        // extract max
+                        int const vec_width = me_c->b_width, vec_height = me_c->b_height;
+                        int const vec_size = me_c->b_count;
+                        //const float mean = me_c->max / (float)me_c->b_count;
+                        int max_mag = me_c->max;
+                        if(motion_type == LK_OPTICAL_FLOW)
+                            max_mag = 14000;
+                        else if(motion_type == BLOCK_MATCHING_ARPS)
+                            max_mag = max(me_c->b_width, me_c->b_height) * 1.414; 
+                        // Convert 16bit grayscale -> rainbow  RGB
+                        image_rainbow = rainbow(me_c->mv_table[0], max_mag, vec_width, vec_height);
+                        //if(!rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean))
+                        //    ESP_LOGW(TAG, "rgbprintf error!");
+                        // send rainbow to stream 
+                        if (!fmt2jpg(image_rainbow->item, vec_size*3, vec_width, vec_height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                            ESP_LOGE(TAG, "fmt2jpg failed");
+                        memcpy(image_motion->item, image_gray->item, count);
+                    }
+                    esp_camera_fb_return(fb); 
+                    fb = NULL;
+                    dl_matrix3du_free(image_rainbow);
+                    dl_matrix3du_free(image_gray);  
+                    image_gray = NULL; image_rainbow = NULL;
                 }
-
-                dl_matrix3du_free(image_matrix); 
-                dl_matrix3du_free(image_gray);  
-                image_matrix = NULL; image_gray = NULL;
+                dl_matrix3du_free(image_matrix); image_matrix = NULL; 
             }
-            
 #endif
         }
         if (res == ESP_OK) {

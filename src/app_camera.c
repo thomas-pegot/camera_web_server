@@ -97,7 +97,7 @@ void app_camera_main ()
     config.xclk_freq_hz = 10000000;
     config.pixel_format = PIXFORMAT_JPEG;
     //init with high specs to pre-allocate larger buffers
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_SVGA;
     config.jpeg_quality = 2;
     config.fb_count = 2;
 
@@ -117,5 +117,5 @@ void app_camera_main ()
     }
     //drop down frame size for higher initial frame rate
     //s->set_xclk(s, )
-    s->set_framesize(s, FRAMESIZE_240X240);
+    s->set_framesize(s, FRAMESIZE_VGA);
 }

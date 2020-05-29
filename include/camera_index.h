@@ -590,9 +590,9 @@ const char* index_ov2640_html = R"~(
 						<div class="input-group" id="motion_type-group">
                             <label for="motion_type">Motion algorithm</label>
                             <select id="motion_type" class="default-action">
+                                <option value="0" selected="selected">-- select --</option>
                                 <option value="2">Block matching</option>
                                 <option value="1">Lucas-Kanade</option>
-                                <option value="0" selected="selected">--select--</option>
                             </select>
                         </div>
                         <div class="input-group" id="face_detect-group">
@@ -1122,10 +1122,8 @@ document.addEventListener('DOMContentLoaded', function (event) {
 
   motion_type.onchange = () => {
     updateConfig(motion_type)
-    if (motion_type.value < 1) {
-      updateValue(detect, false);
-      updateValue(recognize, false);
-    }
+    updateValue(detect, false);
+    updateValue(recognize, false);
   }
 
   framesize.onchange = () => {
@@ -1142,10 +1140,13 @@ document.addEventListener('DOMContentLoaded', function (event) {
       updateValue(detect, false)
       return;
     }
-    if (motion_type.value < 1) {
-      alert("Please select a motion algorithm before. BITCH!");
-      updateValue(detect, false)
-      return;
+    if(detect.checked) {
+      if (motion_type.value < 1) {
+        alert("Please select a motion algorithm before. BITCH!");
+        updateValue(detect, false)
+        updateValue(recognize, false)
+        return;
+      }
     }
     updateConfig(detect)
     if (!detect.checked) {
@@ -1160,10 +1161,13 @@ document.addEventListener('DOMContentLoaded', function (event) {
       updateValue(recognize, false)
       return;
     }
-    if (motion_type.value < 1) {
-      alert("Please select a motion algorithm before. BITCH!");
-      updateValue(recognize, false)
-      return;
+    if(recognize.checked) {
+      if (motion_type.value < 1) {
+        alert("Please select a motion algorithm before. BITCH!");
+        updateValue(detect, false)
+        updateValue(recognize, false)
+        return;
+      }
     }
     updateConfig(recognize)
     if (recognize.checked) {
