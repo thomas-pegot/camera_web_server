@@ -2,10 +2,10 @@
 
 Camera webserver esp32 with motion library. 
 
-| algo  | demo  |
-|---|---|
-|  lucas kanade |  ![lucaskanade_demo](lucaskanade_demo.gif)   |
-| block matching|  ![blockmatching_demo](blockmatching_demo.gif) |
+| algo  | demo  | input size |
+|---|---|---|
+|  lucas kanade |  ![lucaskanade_demo](lucaskanade_demo.gif)   | 160 x 120 |
+| block matching|  ![blockmatching_demo](blockmatching_demo.gif) | 640 x 480 |
 
 
 ## Usage block matching
