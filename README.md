@@ -2,15 +2,15 @@
 
 Camera webserver esp32 with motion library. 
 
-
-|  lucas kanade |  block matching |
+| algo  | demo  |
 |---|---|
-| ![lucaskanade_demo](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/lucaskanade_demo.gif)  |  ![blockmatching_demo](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/blockmatching_demo.gif) |
+|  lucas kanade |  ![lucaskanade_demo](lucaskanade_demo.gif)   |
+| block matching|  ![blockmatching_demo](blockmatching_demo.gif) |
 
 
 ## Usage block matching
 
-![details](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/view_detailed.png)
+![details](view-detailed.png)
 
 ## Preparation
 
