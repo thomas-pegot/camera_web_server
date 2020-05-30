@@ -389,7 +389,11 @@ const char* index_ov2640_html = R"~(
                 <div id="sidebar">
                     <input type="checkbox" id="nav-toggle-cb" checked="checked">
                     <nav id="menu">
-
+                        <section id="buttons">
+                            <button id="get-still">Get Still</button>
+                            <button id="toggle-stream">Start Stream</button>
+                            <button id="face_enroll" class="disabled" disabled="disabled">Unused button</button>
+                        </section>
                         <section id="xclk-section" class="nothidden">
                             <div class="input-group" id="set-xclk-group">
                                 <label for="set-xclk">XCLK MHz</label>
@@ -420,6 +424,48 @@ const char* index_ov2640_html = R"~(
                                 <option value="0">96x96</option>
                             </select>
                         </div>
+                        <div class="input-group" id="motion_type-group">
+                            <label for="motion_type">Motion algorithm</label>
+                            <select id="motion_type" class="default-action">
+                                <option value="0" selected="selected">-- select --</option>
+                                <option value="2">Block matching</option>
+                                <option value="1">Lucas-Kanade</option>
+                            </select>
+                        </div>
+                        <div class="hidden input-group" id="mbsize-group">
+                            <label for="mbsize">MacroBlock size</label>
+                            <div class="range-min">1</div>
+                            <input type="range" id="mbsize" min="1" max="16" value="8" class="default-action">
+                            <div class="range-max">16</div>
+                        </div>                        
+                        <div class="hidden input-group" id="search_parameter-group">
+                            <label for="search_parameter">Search parameter</label>
+                            <div class="range-min">1</div>
+                            <input type="range" id="search_parameter" min="1" max="15" value="7" class="default-action">
+                            <div class="range-max">15</div>
+                        </div>
+                        <div class="input-group" id="face_detect-group">
+                            <label for="face_detect"><span style="font-weight: bold;">Motion enable</span></label>
+                            <div class="switch">
+                                <input id="face_detect" type="checkbox" class="default-action">
+                                <label class="slider" for="face_detect"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="face_recognize-group" >
+                            <label for="face_recognize">Deflicker & Motion</label>
+                            <div class="switch">
+                                <input id="face_recognize" type="checkbox">
+                                <label class="slider" for="face_recognize"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="duration-group">
+                            <label for="duration">Duration</label>
+                            <div class="range-min">0</div>
+                            <input type="range" id="duration" min="0" max="15" value="7" class="default-action">
+                            <div class="range-max">100%</div>
+                        </div>        
+                      <label for="nav-toggle-cam" class="toggle-section-label">&#9776;&nbsp;&nbsp;<span style="color:#D2961E">Camera settings</span></label><input type="checkbox" id="nav-toggle-cam" class="hidden toggle-section-button" checked="checked">
+                      <section class="toggle-section">
                         <div class="input-group" id="quality-group">
                             <label for="quality">Quality</label>
                             <div class="range-min">4</div>
@@ -587,34 +633,8 @@ const char* index_ov2640_html = R"~(
                           <input type="range" id="led_intensity" min="0" max="255" value="0" class="default-action">
                           <div class="range-max">255</div>
                         </div>
-						<div class="input-group" id="motion_type-group">
-                            <label for="motion_type">Motion algorithm</label>
-                            <select id="motion_type" class="default-action">
-                                <option value="0" selected="selected">-- select --</option>
-                                <option value="2">Block matching</option>
-                                <option value="1">Lucas-Kanade</option>
-                            </select>
-                        </div>
-                        <div class="input-group" id="face_detect-group">
-                            <label for="face_detect"><span style="font-weight: bold;">Motion enable</span></label>
-                            <div class="switch">
-                                <input id="face_detect" type="checkbox" class="default-action">
-                                <label class="slider" for="face_detect"></label>
-                            </div>
-                        </div>
-                        <div class="input-group" id="face_recognize-group" >
-                            <label for="face_recognize">Deflicker & Motion</label>
-                            <div class="switch">
-                                <input id="face_recognize" type="checkbox">
-                                <label class="slider" for="face_recognize"></label>
-                            </div>
-                        </div>
-                        <section id="buttons">
-                            <button id="get-still">Get Still</button>
-                            <button id="toggle-stream">Start Stream</button>
-                            <button id="face_enroll" class="disabled" disabled="disabled">Unused button</button>
                         </section>
-
+                        <hr style="width:100%">
                         <div style="margin-top: 8px;"><center><span style="font-weight: bold;">Advanced Settings</span></center></div>
                         <hr style="width:100%">
                         <label for="nav-toggle-reg" class="toggle-section-label">&#9776;&nbsp;&nbsp;Register Get/Set</label><input type="checkbox" id="nav-toggle-reg" class="hidden toggle-section-button" checked="checked">
@@ -938,6 +958,10 @@ document.addEventListener('DOMContentLoaded', function (event) {
     } else if(!updateRemote){
       if(el.id === "aec"){
         value ? hide(exposure) : show(exposure)
+      } else if(el.id === "mbsize") {
+        (value < 2) ? hide(mbsize) : show(mbsize)
+      } else if(el.id === "search_parameter") {
+        (value < 2) ? hide(search_parameter) : show(search_parameter)
       } else if(el.id === "agc"){
         if (value) {
           show(gainCeiling)
@@ -1119,11 +1143,15 @@ document.addEventListener('DOMContentLoaded', function (event) {
   const detect = document.getElementById('face_detect')
   const recognize = document.getElementById('face_recognize')
   const framesize = document.getElementById('framesize')
+  const mbsize = document.getElementById('mbsize-group')
+  const search_parameter = document.getElementById('search_parameter-group')
 
   motion_type.onchange = () => {
     updateConfig(motion_type)
     updateValue(detect, false);
     updateValue(recognize, false);
+    (motion_type.value < 2) ? hide(mbsize) : show(mbsize);
+    (motion_type.value < 2) ? hide(search_parameter) : show(search_parameter);
   }
 
   framesize.onchange = () => {
