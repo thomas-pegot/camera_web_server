@@ -3,17 +3,23 @@
 Camera webserver esp32 with motion library. 
 
 
-![Demo motion](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/video_presentation.gif)
-![rainbow](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/rainbow.png)
+|  lucas kanade |  block matching |
+|---|---|
+| ![lucaskanade_demo](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/lucaskanade_demo.gif)  |  ![blockmatching_demo](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/blockmatching_demo.gif) |
 
-# Preparation
+
+## Usage block matching
+
+![details](https://raw.githubusercontent.com/thomas-pegot/camera_web_server/master/view_detailed.png)
+
+## Preparation
 
 To run this example, you need the following components:
 
 * An ESP32 Module: Either **ESP32-WROVER-KIT** or **ESP-EYE**.
 * A Camera Module: Either **OV2640** or **OV3660** or **OV5640**.
 
-# Quick Start
+## Quick Start
 
 After you've completed the hardware settings, please follow the steps below:
 

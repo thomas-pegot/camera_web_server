@@ -164,6 +164,7 @@ static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_
 dl_matrix3du_t *rainbow(MotionVector16_t *vec, float max, int w, int h)
 {
     dl_matrix3du_t *rgb = dl_matrix3du_alloc(1, w, h, 3);
+    memset(rgb->item, 0, w*h*3);
     MotionVector16_t *pvec = vec;
     int len = w*h;
     uint8_t *b = rgb->item;
@@ -328,6 +329,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     dl_matrix3du_t *image_matrix = NULL;
     init = 1; 
     dl_matrix3du_t *image_gray =  NULL;
+    dl_matrix3du_t *null = dl_matrix3du_alloc(1, 240, 240, 3);
     MotionEstContext ctx;
 #endif
 
@@ -363,7 +365,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     me_c = NULL;
                 }
                 if (fb->format != PIXFORMAT_JPEG){
-                    bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+                    bool jpeg_converted = frame2jpg(fb, 60, &_jpg_buf, &_jpg_buf_len);
                     esp_camera_fb_return(fb);
                     fb = NULL;
                     if (!jpeg_converted){
@@ -375,16 +377,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     _jpg_buf = fb->buf;
                 }
             } else if(!detection_enabled) {
-                image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-                memset(image_matrix->item, 0, fb->width*fb->height*3);
-                draw_boxes(image_matrix, 1, 1, mbsize + 1, mbsize + 1, FACE_COLOR_CYAN); 
-                if(!rgb_printf(image_matrix, FACE_COLOR_CYAN, "MB : %u\n p size : %u", mbsize, search_parameter))
+                memset(null->item, 0, 172800);
+                draw_boxes(null, 1, 1, mbsize + 1, mbsize + 1, FACE_COLOR_CYAN); 
+                if(!rgb_printf(null, FACE_COLOR_CYAN, "MB: %u\np: %u", mbsize, search_parameter))
                     ESP_LOGW(TAG, "rgbprintf error!"); 
-                if (!fmt2jpg(image_matrix->item, fb->width*fb->height*3, fb->width, fb->height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                if (!fmt2jpg(null->item, 240*240*3, 240, 240, PIXFORMAT_RGB888, 40, &_jpg_buf, &_jpg_buf_len))
                     ESP_LOGE(TAG, "fmt2jpg failed");
-                    
-                esp_camera_fb_return(fb); fb = NULL;
-                dl_matrix3du_free(image_matrix); image_matrix = NULL;                
+                esp_camera_fb_return(fb); fb = NULL;          
 #if CONFIG_ESP_FACE_DETECT_ENABLED
             }else if( wdt_safety_cnt > duration - 1 ) {
                 // Trick to avoid triggering watchdog but need to change in futur
@@ -399,7 +398,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
                     res = ESP_FAIL;
                 } else if(fb->format != PIXFORMAT_JPEG) {
-                    bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+                    bool jpeg_converted = frame2jpg(fb, 60, &_jpg_buf, &_jpg_buf_len);
                     esp_camera_fb_return(fb);
                     fb = NULL;
                     if (!jpeg_converted){
@@ -446,20 +445,17 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         ESP_LOGI(TAG, "[%s] time: %u ms   max: %u  || heap free: %u kB ", &me_c->name[0],  
                             (uint32_t)(esp_timer_get_time() - arps_start)/1000, me_c->max, esp_get_free_heap_size()>>10);                             
                         // extract max
-                        int const vec_width = me_c->b_width, vec_height = me_c->b_height;
-                        int const vec_size = me_c->b_count;
-                        //const float mean = me_c->max / (float)me_c->b_count;
                         int max_mag = me_c->max;
                         if(motion_type == LK_OPTICAL_FLOW)
                             max_mag = 14000;
                         else if(motion_type == BLOCK_MATCHING_ARPS)
                             max_mag = 200; 
                         // Convert 16bit grayscale -> rainbow  RGB
-                        image_rainbow = rainbow(me_c->mv_table[0], max_mag, vec_width, vec_height);
+                        image_rainbow = rainbow(me_c->mv_table[0], max_mag, me_c->b_width, me_c->b_height);
                         //if(!rgb_printf(image_rainbow, FACE_COLOR_WHITE, "%u", (short)mean))
                         //    ESP_LOGW(TAG, "rgbprintf error!");
                         // send rainbow to stream 
-                        if (!fmt2jpg(image_rainbow->item, vec_size*3, vec_width, vec_height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
+                        if (!fmt2jpg(image_rainbow->item, me_c->b_count*3, me_c->b_width, me_c->b_height, PIXFORMAT_RGB888, 60, &_jpg_buf, &_jpg_buf_len))
                             ESP_LOGE(TAG, "fmt2jpg failed");
                         memcpy(image_motion->item, image_gray->item, count);
                         esp_camera_fb_return(fb); 
