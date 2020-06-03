@@ -398,7 +398,7 @@ const char* index_ov2640_html = R"~(
                             <div class="input-group" id="set-xclk-group">
                                 <label for="set-xclk">XCLK MHz</label>
                                 <div class="text">
-                                    <input id="xclk" type="text" minlength="1" maxlength="2" size="2" value="20">
+                                    <input id="xclk" type="text" minlength="1" maxlength="2" size="2" value="5">
                                 </div>
                                 <button class="inline-button" id="set-xclk">Set</button>
                             </div>
@@ -428,7 +428,8 @@ const char* index_ov2640_html = R"~(
                             <label for="motion_type">Motion algorithm</label>
                             <select id="motion_type" class="default-action">
                                 <option value="0" selected="selected">-- select --</option>
-                                <option value="2">Block matching</option>
+                                <option value="3">Block matching EPZS</option>
+                                <option value="2">Block matching ARPS</option>
                                 <option value="1">Lucas-Kanade</option>
                             </select>
                         </div>
@@ -1156,14 +1157,14 @@ document.addEventListener('DOMContentLoaded', function (event) {
 
   framesize.onchange = () => {
     updateConfig(framesize)
-    if (framesize.value > 10) {
+    if (framesize.value > 8) {
       updateValue(detect, false)
       updateValue(recognize, false)
     }
   }
 
   detect.onchange = () => {
-    if (framesize.value > 10) {
+    if (framesize.value > 8) {
       alert("Please select lower resolution before enabling this feature!");
       updateValue(detect, false)
       return;
@@ -1184,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', function (event) {
   }
 
   recognize.onchange = () => {
-    if (framesize.value > 10) {
+    if (framesize.value > 8) {
       alert("Please select lower resolution before enabling this feature!");
       updateValue(recognize, false)
       return;
