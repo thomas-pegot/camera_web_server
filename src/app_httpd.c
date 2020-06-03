@@ -66,8 +66,8 @@ static int8_t detection_enabled = 0;
 #endif
 
 static int8_t motion_type = 0;
-static uint8_t mbsize = 8;
-static uint8_t search_parameter = 7;
+static uint8_t mbsize = 6;
+static uint8_t search_parameter = 9;
 static uint8_t duration = 50;
 
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
