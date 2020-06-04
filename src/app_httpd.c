@@ -372,7 +372,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
     dl_matrix3du_t *image_matrix = NULL;
     init = 1; 
     dl_matrix3du_t *image_gray =  NULL;
-    dl_matrix3d_t *image_out =  NULL;
     dl_matrix3du_t *null = dl_matrix3du_alloc(1, 240, 240, 3);
     MotionEstContext me_ctx;
 #endif
@@ -402,10 +401,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
             {
 #endif
                 if(!init)
-                    uninit(&me_ctx); 
+                    uninit(me_c); 
                 init = 1;
-                dl_matrix3du_free(image_motion); dl_matrix3d_free(image_out);
-                image_motion = NULL; image_out = NULL;
+                dl_matrix3du_free(image_motion); 
+                image_motion = NULL; 
                 me_c = NULL;
                 if (fb->format != PIXFORMAT_JPEG){
                     bool jpeg_converted = frame2jpg(fb, 60, &_jpg_buf, &_jpg_buf_len);
@@ -420,6 +419,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     _jpg_buf = fb->buf;
                 }
             } else if(!detection_enabled) {
+                if(!init)
+                    uninit(me_c); 
+                init = 1;
+                dl_matrix3du_free(image_motion);
+                image_motion = NULL; 
+                me_c = NULL;
                 memset(null->item, 0, 172800);
                 draw_boxes(null, 1, 1, mbsize + 1, mbsize + 1, FACE_COLOR_CYAN); 
                 if(!rgb_printf(null, FACE_COLOR_CYAN, "MB: %u\np: %u", mbsize, search_parameter))
@@ -464,21 +469,26 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #endif
                     int64_t arps_start = esp_timer_get_time();
                     //update parameter
-                    if (!init && me_c->method > 1) {
+                    if(!init) {
                         me_c->search_param = search_parameter;
                         me_c->mbSize = mbsize;
                         me_c->method = motion_type;
                     }
                     //First time: init context and allocate image motion once
                     if (init) {    
-                        me_c = &me_ctx;     
+                        me_c = &me_ctx;
+                        me_c->method = motion_type;
+                        me_c->width = w; 
+                        me_c->height = h;     
                         //allocate motion vect table
-                        if(motion_type == LK_OPTICAL_FLOW)
-                            init_context(me_c, motion_type, 1, 6, w, h);
-                        else {
-                            image_out = dl_matrix3d_alloc(1, w, h, 1);
-                            init_context(me_c, motion_type, mbsize, search_parameter, w, h);
+                        if(motion_type == BLOCK_MATCHING_EPZS || motion_type == BLOCK_MATCHING_ARPS) {
+                            me_c->mbSize = mbsize;
+                            me_c->search_param = search_parameter;
                         }
+                        
+                        if(!init_context(me_c))
+                            ESP_LOGE(TAG, "couldn't init motion context");
+
                         //Keep last image in memory as image_motion = Image {t-1} 
                         image_motion = dl_matrix3du_alloc(1, w, h, 1);    
                         if(!image_motion) {
@@ -498,15 +508,17 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         arps_start = esp_timer_get_time(); 
                         // extract max
                         int max_mag = me_c->max;
+                        
                         if(motion_type == LK_OPTICAL_FLOW){
                             max_mag = 110;
                             // Convert 16bit grayscale -> rainbow  RGB
-                            image_rainbow = rainbow(me_c->mv_table[0], max_mag, me_c->b_width, me_c->b_height);  
+                            image_rainbow = rainbow(me_c->mv_table[0], max_mag, w, h);  
                         } else if(motion_type > 1 ) {
                             max_mag = 200;//me_c->b_height + me_c->b_width - 2 * me_c->mbSize; 
                             // Convert uint16 block grayscale -> rainbow  RGB and upscale
                             image_rainbow = rainbow_block(me_c, max_mag, w, h);                 
                         }
+                        
                         if (!fmt2jpg(image_rainbow->item, w*h*3, w, h, PIXFORMAT_RGB888, 10, &_jpg_buf, &_jpg_buf_len))
                             ESP_LOGE(TAG, "fmt2jpg failed");
                         memcpy(image_motion->item, image_gray->item, count);
@@ -549,7 +561,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
         me_c = NULL;
     }
     dl_matrix3du_free(image_motion); image_motion = NULL;
-    dl_matrix3d_free(image_out); image_out = NULL;
     dl_matrix3du_free(null); null = NULL;
     init = 1;
     return res;
