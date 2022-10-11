@@ -21,4 +21,4 @@ jobs:
    - name: Checkout repository
      uses: actions/checkout@v2
    - name: Checkout submodules
-     run: git pull --recurse-submodule --force origin master
+     run: git submodule update --remote --merge
