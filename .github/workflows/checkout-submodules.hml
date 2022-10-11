@@ -1,0 +1,25 @@
+---
+name: Submodule Updates
+ 
+#############################
+# Start the job on all push #
+#############################
+on:
+  push:
+    branches: master
+  pull_request:
+    branches: master
+ 
+###############
+# Set the Job #
+###############
+jobs:
+  build:
+    name: Submodule update
+    runs-on: ubuntu-latest
+    
+steps:
+- name: Checkout repository
+  uses: actions/checkout@v2
+- name: Checkout submodules
+  run: git submodule update --init --recursive
