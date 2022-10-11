@@ -1,0 +1,6 @@
+tasks:
+  - command: pip3 install -U platformio && platformio run -e camera_web_server
+
+image:
+  file: .gitpod.Dockerfile
+
