@@ -3,7 +3,7 @@
 	url = https://github.com/thomas-pegot/esp32-motion
 
 
-[submodule "esp32-camera"]
-	path = esp32-camera
+[submodule "components/esp32-camera"]
+	path = components/esp32-camera
 	url = https://github.com/thomas-pegot/esp32-camera
 	branch = jgpd
