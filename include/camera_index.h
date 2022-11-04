@@ -428,6 +428,7 @@ const char* index_ov2640_html = R"~(
                             <label for="motion_type">Motion algorithm</label>
                             <select id="motion_type" class="default-action">
                                 <option value="0" selected="selected">-- select --</option>
+                                <option value="-1">gray</option>
                                 <option value="3">Block matching EPZS</option>
                                 <option value="2">Block matching ARPS</option>
                                 <option value="1">Lucas-Kanade</option>

@@ -14,7 +14,7 @@ set(COMPONENT_EMBED_FILES
 
 set(COMPONENT_REQUIRES
         esp32-motion
-        esp32-camera-master
+        esp32-camera
         nvs_flash
         esp_http_server
         fb_gfx

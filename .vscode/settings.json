@@ -60,7 +60,21 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "iomanip": "cpp",
-        "*.ipp": "c"
+        "*.ipp": "c",
+        "cassert": "c",
+        "cerrno": "c",
+        "cfloat": "c",
+        "climits": "c",
+        "ios": "c",
+        "locale": "c",
+        "queue": "c",
+        "cstdbool": "c"
     },
-    "C_Cpp.dimInactiveRegions": false
+    "C_Cpp.dimInactiveRegions": false,
+    "idf.adapterTargetName": "esp32",
+    "idf.portWin": "COM6",
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp32_devkitj_v1.cfg",
+        "target/esp32.cfg"
+    ]
 }
