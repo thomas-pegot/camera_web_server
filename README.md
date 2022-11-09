@@ -1,6 +1,21 @@
 # Camera webserver with motion
 
-Camera webserver esp32 with motion library. 
+## Changes
+- esp32motion : enhanced EPZS algorithm accuracy at the cost of computation load.
+- added JPEG decoder :
+  - Now it won't load the library from the internal ROM/jpgd.h but instead a custom `jpgd.h` library in development.
+  - `jpgd.h` can handle new features, at the moment : 
+    -   `jpg2gray` : convert directly during decoding to monochrome
+    -   `jpg2gray_filtered` : during conversion apply a median filter to remove horizontal line artifacts. (cf .gif below)
+    -   TODO : develop a DCT-phase filter which can be usefull for motion detection
+    -   TODO : develop a DCT based denoiser, deblocker
+  -   Removed upscaling (too slow)
+  -   GUI added a test "Motion Algorithm" which is just the capture converted to gray. It show the decoder latency and the effect of artifacts filtering.   
+
+![jpg2gray_filter](jpg2gray_filter.gif)
+
+
+## Old Results
 
 | algo  | demo  | input size | time |
 |---|---|---|---|

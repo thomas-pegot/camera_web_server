@@ -442,8 +442,8 @@ const char* index_ov2640_html = R"~(
                         </div>                        
                         <div class="hidden input-group" id="search_parameter-group">
                             <label for="search_parameter">Search parameter</label>
-                            <div class="range-min">1</div>
-                            <input type="range" id="search_parameter" min="1" max="15" default="5" class="default-action">
+                            <div class="range-min">3</div>
+                            <input type="range" id="search_parameter" min="3" max="15" default="5" class="default-action">
                             <div class="range-max">15</div>
                         </div>
                         <div class="input-group" id="face_detect-group">
@@ -454,7 +454,7 @@ const char* index_ov2640_html = R"~(
                             </div>
                         </div>
                         <div class="input-group" id="face_recognize-group" >
-                            <label for="face_recognize">Motion Colormap</label>
+                            <label for="face_recognize">Filtered + Motion</label>
                             <div class="switch">
                                 <input id="face_recognize" type="checkbox">
                                 <label class="slider" for="face_recognize"></label>

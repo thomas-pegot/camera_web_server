@@ -47,6 +47,14 @@ static const char *TAG = "camera_httpd";
 #define FACE_COLOR_PURPLE (FACE_COLOR_BLUE | FACE_COLOR_RED)
 #endif
 
+#ifndef median
+#define median median
+static inline int median(int a, int b, int c)
+{
+    return (b > a) == (a > c) ? a : (b > a) != (b > c) ? b : c;
+}
+#endif
+
 typedef struct
 {
     httpd_req_t *req;
@@ -70,9 +78,9 @@ static int8_t recognition_enabled = 0;
 #endif
 
 static int8_t motion_type = 0;
-static uint8_t mbsize = 4;
-static uint8_t search_parameter = 5;
-static uint8_t duration = 70;
+static uint8_t mbsize = 8;
+static uint8_t search_parameter = 7;
+static uint8_t duration = 50;
 
 static int init = 1;
 static int wdt_safety_cnt = 0;
@@ -329,12 +337,12 @@ static esp_err_t capture_handler(httpd_req_t *req)
             memcpy(image_motion->item, image_gray->item, count);
             init = 0;
         }  
-
+        /*
         // # Optical flow with vector 
         if(!LK_optical_flow(image_gray->item, image_motion->item, vector, w, h, &max_mag2)) {
             ESP_LOGE(TAG, "LK_optical_flow failed");
             res = ESP_FAIL;
-        }
+        }*/
         memcpy(image_motion->item, image_gray->item, count);
 
         if(image_rainbow) dl_matrix3du_free(image_rainbow);
@@ -440,6 +448,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
             } else {
                 const int w = fb->width, h = fb->height;           
                 const int count = fb->width * fb->height;
+                if(image_matrix)
+                    dl_matrix3du_free(image_matrix);
                 image_matrix = dl_matrix3du_alloc(1, w, h, 1);
                 if (!image_matrix) {
                     ESP_LOGE(TAG,"dl_matrix3du_alloc failed");
@@ -453,13 +463,29 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         ESP_LOGE(TAG, "JPEG compression failed");
                         res = ESP_FAIL;
                     }
-                } else if(!jpg2gray(fb->buf, fb->len, image_matrix->item, JPG_SCALE_NONE)){
-                    ESP_LOGE(TAG,"fmt2rgb888 failed. heap free : %u bytes", esp_get_free_heap_size());
+                } else if(!recognition_enabled && !jpg2gray(fb->buf, fb->len, image_matrix->item, JPG_SCALE_NONE)){
+                    ESP_LOGE(TAG,"jpg2gray failed. heap free : %u bytes", esp_get_free_heap_size());
+                    res = ESP_FAIL;
+                } else if(recognition_enabled && !jpg2gray_filtered(fb->buf, fb->len, image_matrix->item, JPG_SCALE_NONE)){
+                    ESP_LOGE(TAG,"jpg2gray_filtered failed. heap free : %u bytes", esp_get_free_heap_size());
                     res = ESP_FAIL;
                 } else if(motion_type == -1){
+                           
+                     int64_t  arps_start = esp_timer_get_time(); 
                     // Case motion type = gray level image input for test
-                    if (!fmt2jpg(image_matrix->item, count, w, h, PIXFORMAT_GRAYSCALE, 12, &_jpg_buf, &_jpg_buf_len))
+                    if(CONFIG_ESP_FACE_RECOGNITION_ENABLED && recognition_enabled){
+                        for(int i = w; i < (w - 1) * h; i++){
+                            image_matrix->item[i] = median(image_matrix->item[i - w * 2], image_matrix->item[i + w * 2],
+                                                            median(image_matrix->item[i],
+                                                            image_matrix->item[i - w],
+                                                            image_matrix->item[i + w]));
+                        }
+                    }
+                    if (!fmt2jpg(image_matrix->item, count, w, h, PIXFORMAT_GRAYSCALE, 60, &_jpg_buf, &_jpg_buf_len))
                         ESP_LOGE(TAG, "fmt2jpg failed");
+                    esp_camera_fb_return(fb); fb = NULL;
+                    ESP_LOGI(TAG, "time: %u ms   || heap free: %u kB ",  
+                        (uint32_t)(esp_timer_get_time() - arps_start)/1000, esp_get_free_heap_size()>>10);  
                 } else {
                     wdt_safety_cnt++;
 
@@ -511,21 +537,21 @@ static esp_err_t stream_handler(httpd_req_t *req)
                         if(motion_type > 1 ) { 
                             // block matching type algo width (resp. height) of image is number of macroblock in width (resp. height)
                             dispWidth = me_c->b_width;                            
-                            dispHeight = me_c->b_height;                         
+                            dispHeight = me_c->b_height; 
                         }
                         
-                        if(CONFIG_ESP_FACE_RECOGNITION_ENABLED && recognition_enabled){ // colormap motion enabled
-                            image_display = rainbow(me_c->mv_table[0], me_c->max, dispWidth, dispHeight);
-                        } else {
+                        //if(recognition_enabled){ // colormap motion enabled
+                        image_display = rainbow(me_c->mv_table[0], me_c->max, dispWidth, dispHeight);
+                        /*/} else {
                             image_display = dl_matrix3du_alloc(1, dispWidth, dispHeight, 1); 
                             // Normalise output to [0..255] and copy to display array
                             for(int mbi=0; mbi < dispWidth * dispHeight; mbi++)
-                                image_display->item[mbi] = (uint8_t) me_c->mv_table[0][mbi].mag2 * 255 / (1.0 * me_c->max);
-                        }
+                                image_display->item[mbi] = (uint8_t) me_c->mv_table[0][mbi].mag2 * 255.0 / (1.0 * me_c->max);
+                        }*/
 
                         // Convert display array to jpg format
-                        if (!fmt2jpg(image_display->item, dispWidth * dispHeight * (recognition_enabled ? 3 : 1),\
-                                dispWidth, dispHeight, (recognition_enabled ? PIXFORMAT_RGB888 : PIXFORMAT_GRAYSCALE),\
+                        if (!fmt2jpg(image_display->item, dispWidth * dispHeight * 3,\
+                                dispWidth, dispHeight, PIXFORMAT_RGB888,\
                                  8, &_jpg_buf, &_jpg_buf_len))
                             ESP_LOGE(TAG, "fmt2jpg failed");
                         memcpy(image_motion->item, image_matrix->item, count);
