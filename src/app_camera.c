@@ -98,7 +98,7 @@ void app_camera_main ()
     config.pixel_format = PIXFORMAT_JPEG;
     //init with high specs to pre-allocate larger buffers
     config.frame_size = FRAMESIZE_SVGA;
-    config.jpeg_quality = 8;
+    config.jpeg_quality = 12;
     config.fb_count = 2;
 
     // camera init

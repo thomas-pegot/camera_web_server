@@ -24,9 +24,15 @@
 #include "app_wifi.h"
 #include "app_httpd.h"
 #include "app_mdns.h"
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+
 
 void app_main()
 {
+    // in setup()
+    //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
     app_wifi_main();
     app_camera_main();
     app_httpd_main();

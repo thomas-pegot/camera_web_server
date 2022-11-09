@@ -152,7 +152,7 @@ const char* index_ov2640_html = R"~(
 
             .save {
                 position: absolute;
-                right: 25px;
+                right: 15px;
                 top: 0px;
                 height: 16px;
                 line-height: 16px;
@@ -428,6 +428,7 @@ const char* index_ov2640_html = R"~(
                             <label for="motion_type">Motion algorithm</label>
                             <select id="motion_type" class="default-action">
                                 <option value="0" selected="selected">-- select --</option>
+                                <option value="-1">gray</option>
                                 <option value="3">Block matching EPZS</option>
                                 <option value="2">Block matching ARPS</option>
                                 <option value="1">Lucas-Kanade</option>
@@ -435,14 +436,14 @@ const char* index_ov2640_html = R"~(
                         </div>
                         <div class="hidden input-group" id="mbsize-group">
                             <label for="mbsize">MacroBlock size</label>
-                            <div class="range-min">1</div>
-                            <input type="range" id="mbsize" min="1" max="16" value="8" class="default-action">
+                            <div class="range-min">4</div>
+                            <input type="range" id="mbsize" min="4" max="16" default="4" step="2" class="default-action">
                             <div class="range-max">16</div>
                         </div>                        
                         <div class="hidden input-group" id="search_parameter-group">
                             <label for="search_parameter">Search parameter</label>
-                            <div class="range-min">1</div>
-                            <input type="range" id="search_parameter" min="1" max="15" value="7" class="default-action">
+                            <div class="range-min">3</div>
+                            <input type="range" id="search_parameter" min="3" max="15" default="5" class="default-action">
                             <div class="range-max">15</div>
                         </div>
                         <div class="input-group" id="face_detect-group">
@@ -453,7 +454,7 @@ const char* index_ov2640_html = R"~(
                             </div>
                         </div>
                         <div class="input-group" id="face_recognize-group" >
-                            <label for="face_recognize">Deflicker & Motion</label>
+                            <label for="face_recognize">Filtered + Motion</label>
                             <div class="switch">
                                 <input id="face_recognize" type="checkbox">
                                 <label class="slider" for="face_recognize"></label>
@@ -462,7 +463,7 @@ const char* index_ov2640_html = R"~(
                         <div class="input-group" id="duration-group">
                             <label for="duration">Duration</label>
                             <div class="range-min">0</div>
-                            <input type="range" id="duration" min="0" max="15" value="7" class="default-action">
+                            <input type="range" id="duration" min="0" max="15" value="9" class="default-action">
                             <div class="range-max">100%</div>
                         </div>        
                       <label for="nav-toggle-cam" class="toggle-section-label">&#9776;&nbsp;&nbsp;<span style="color:#D2961E">Camera settings</span></label><input type="checkbox" id="nav-toggle-cam" class="hidden toggle-section-button" checked="checked">
@@ -1151,27 +1152,43 @@ document.addEventListener('DOMContentLoaded', function (event) {
     updateConfig(motion_type)
     updateValue(detect, false);
     updateValue(recognize, false);
+    if(motion_type.value == -1){
+      hide(detect)
+      hide(recognize)
+    }else{
+      show(detect)
+      show(recognize)
+    }
     (motion_type.value < 2) ? hide(mbsize) : show(mbsize);
     (motion_type.value < 2) ? hide(search_parameter) : show(search_parameter);
   }
 
   framesize.onchange = () => {
+    if (detect.checked || recognize.checked) {
+      updateValue(detect, false)
+      updateValue(recognize, false)
+    }
     updateConfig(framesize)
-    if (framesize.value > 8) {
+    if ( (framesize.value > 8) || ((motion_type.value == 1) && (framesize.value > 4)) ) {
       updateValue(detect, false)
       updateValue(recognize, false)
     }
   }
 
   detect.onchange = () => {
+    if ( (motion_type.value == 1) && (framesize.value > 4)) {
+      alert("Please select lower resolution for Lucas Kanade algorithm!");
+      updateValue(detect, false)
+      return;
+    }
     if (framesize.value > 8) {
       alert("Please select lower resolution before enabling this feature!");
       updateValue(detect, false)
       return;
     }
     if(detect.checked) {
-      if (motion_type.value < 1) {
-        alert("Please select a motion algorithm before. BITCH!");
+      if (!motion_type.value) {
+        alert("Please select a motion algorithm before. sir!");
         updateValue(detect, false)
         updateValue(recognize, false)
         return;
@@ -1185,14 +1202,19 @@ document.addEventListener('DOMContentLoaded', function (event) {
   }
 
   recognize.onchange = () => {
+    if ( (motion_type.value == 1) && (framesize.value > 4)) {
+      alert("Please select lower resolution for Lucas Kanade algorithm!");
+      updateValue(detect, false)
+      return;
+    }
     if (framesize.value > 8) {
       alert("Please select lower resolution before enabling this feature!");
       updateValue(recognize, false)
       return;
     }
     if(recognize.checked) {
-      if (motion_type.value < 1) {
-        alert("Please select a motion algorithm before. BITCH!");
+      if (!motion_type.value) {
+        alert("Please select a motion algorithm before. sir!");
         updateValue(detect, false)
         updateValue(recognize, false)
         return;
