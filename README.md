@@ -34,8 +34,20 @@ Note : Block matching takes longer to display (2sec per frame) because of upscal
 
 To run this example, you need the following components:
 
-* An ESP32 Module: Either **ESP32-WROVER-KIT** or **ESP-EYE**.
-* A Camera Module: Either **OV2640** or **OV3660** or **OV5640**.
+* An ESP32 Module: Either **ESP32-CAM**.
+* A Camera Module: Either **OV2640**.
+
+## Quickstart with PlatformIO + VScode
+
+ - Press F1 (_Show All Commands_) and type `PlatformIO: Open PlatformIO Core CLI`. It will open a terminal and load `pio`. From there run the command :
+   - `pio run -t menuconfig -e release` : Will load release config file  _sdkconfig.release_ (-O2 optim, IRAM optimisation). This mode is specific for serial device since it can't debug.
+   - `pio run -t menuconfig -e debug` : Will load debug config file  _sdkconfig.debug_ (-Og debug, Flash instead of IRAM, reduced CLCK speed). This mode is specific for JTAG/ESP-Prog device.
+   - Under `Camera Web Server ---> Wifi Settings` you can change WiFi configuration (STA and AP)
+ - `pio run -t build -e release` or `debug`
+ - `pio run -t upload -e release`  or `debug`
+ - Follow from step 4. in next section
+
+
 
 ## Quick Start
 
@@ -46,7 +58,7 @@ After you've completed the hardware settings, please follow the steps below:
 3. **Build And Flash** the application to ESP32;
 4. **Open Your Browser** and point it to `http://[ip-of-esp32]/`;
 5. **To Get Image** press `Get Still` or `Start Stream`;
-6. **Use The Options** to enable/disable Motion detection, Dithering and more;
+6. **Use The Options** to enable/disable Motion detection, Filtering and more;
 t. **View The Stream**  in a player like VLC: Open Network `http://[ip-of-esp32]:81/stream`;
 
 For more details of the http handler, please refer to [esp32-camera](https://github.com/espressif/esp32-camera).

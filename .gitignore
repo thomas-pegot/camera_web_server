@@ -7,4 +7,6 @@
 sdkconfig.old
 build/*
 build
-sdkconfig.*
+sdkconfig.release.old
+sdkconfig.debugs
+sdkconfig.debug.old
