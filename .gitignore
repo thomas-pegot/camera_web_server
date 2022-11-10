@@ -7,3 +7,4 @@
 sdkconfig.old
 build/*
 build
+sdkconfig.*
