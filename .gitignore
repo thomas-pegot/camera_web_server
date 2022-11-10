@@ -4,7 +4,6 @@
 .vscode/launch.json
 .vscode/ipch
 .travis.yml
-sdkconfig.old
 build/*
 build
 sdkconfig.release.old
