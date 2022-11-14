@@ -7,7 +7,7 @@ additionalRepositories:
 
 tasks: 
   - name: esp32-camera
-    before: cd ../esp32-camera && git checkout jpgd
+    before: cd ../esp32-camera && git pull origin jpgd && git switch jpgd
   - name: camera_web_server
     before: |
       (
