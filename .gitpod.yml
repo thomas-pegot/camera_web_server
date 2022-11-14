@@ -5,7 +5,7 @@ additionalRepositories:
 
 tasks: 
   - name: camera_web_server
-    before: cd ../camera_web_server &&  rm -r esp32-motion && cp -r /workspace/esp32-motion ./component/esp32-motion
+    before: cd ../camera_web_server &&  rm -r components/esp32-motion && cp -r /workspace/esp32-motion components/esp32-motion
     command: pip3 install -U platformio && platformio run -e release
 
 image:
