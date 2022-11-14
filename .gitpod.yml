@@ -7,15 +7,16 @@ additionalRepositories:
 
 tasks: 
   - name: esp32-camera
-    init: >
-    cd ../esp32-camera && 
-    git pull origin jpgd &&
-    gp sync-done bundle
-
+    init: |
+      (
+        cd ../esp32-camera
+        git pull origin jpgd
+        gp sync-done bundle
+      )
   - name: camera_web_server
-    init: gp sync-await bundle
     before: |
       (
+        gp sync-await bundle
         cd ../camera_web_server
         rm -r components/esp32-motion components/esp32-camera
         cp -r /workspace/esp32-motion components/esp32-motion
