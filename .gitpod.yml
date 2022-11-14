@@ -3,16 +3,7 @@ additionalRepositories:
   - url: https://github.com/thomas-pegot/esp32-motion
     checkoutLocation: esp32-motion
 
-additionalRepositories: 
-  - url: https://github.com/thomas-pegot/esp32-motion 
-  checkoutLocation: esp32-motion 
-  - url: https://github.com/thomas-pegot/esp32-camera 
-  checkoutLocation: esp32-camera
-
 tasks: 
- #- name: esp32-camera
- # before: |
- # cd ../esp32-camera git checkout jpgd 
   - name: camera_web_server
    before: cd ../camera_web_server &&  rm -r esp32-motion && cp -r /workspace/esp32-motion ./component/esp32-motion
    command: pip3 install -U platformio && platformio run -e release
