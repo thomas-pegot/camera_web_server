@@ -1,3 +1,10 @@
+# example .gitpod.yml from https://github.com/gitpod-io/demo-multi-repo-frontend
+additionalRepositories:
+  - url: https://github.com/thomas-pegot/esp32-motion
+    checkoutLocation: workspace/camera_web_server/components
+  - url: git@github.com:thomas-pegot/esp32-camera.git
+    checkoutLocation: workspace/camera_web_server/components
+
 tasks:
   - command: pip3 install -U platformio && platformio run -e release
 
