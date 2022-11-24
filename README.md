@@ -16,7 +16,7 @@
 ### Phase/Magnitude DCT
 |gray| Phase |Magnitude |
 |---|---|---|
-|![gray](gray.jpg)|![Phase DCT](Phase%20DCT.jpg)|![Modulation](Mag%20DCT.jpg)|
+|![gray](gray.jpg)|![Phase DCT](Phase_DCT.jpg)|![Modulation](Mag_DCT.jpg)|
 
 ### `jpg2gray_filtered`
 ![jpg2gray_filter](jpg2gray_filter.gif)
