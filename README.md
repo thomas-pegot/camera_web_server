@@ -1,7 +1,7 @@
 # Camera webserver with motion
 
 ## Changes
-- esp32motion : enhanced EPZS algorithm accuracy at the cost of computation load.
+- esp32motion : enhanced EPZS algorithm accuracy. Now it is possible to choose FFMPEG or MPEG4_AVC version by changing `FFMPEG` value in `esp32-motion/epsz.c` 
 - added JPEG decoder :
   - Now it won't load the library from the internal ROM/jpgd.h but instead a custom `jpgd.h` library in development.
   - `jpgd.h` can handle new features, at the moment : 
@@ -10,16 +10,16 @@
     -   developped a DCT-phase filter which can be usefull for motion detection
     -   developped a DCT based denoiser
   -   Removed upscaling (too slow)
-  -   GUI added a test "Motion Algorithm" which is just the capture converted to gray. It show the decoder latency and the effect of artifacts filtering.   
+  -   GUI added a test "Motion Algorithm" which is just the capture converted to gray. It shows the decoder latency and the effect of artifacts filtering.   
 
 
 ### Phase/Magnitude DCT
 |gray| Phase |Magnitude |
 |---|---|---|
-|![gray](gray.jpg)|![Phase DCT](Phase_DCT.jpg)|![Modulation](Mag_DCT.jpg)|
+|![gray](data/gray.jpg)|![Phase DCT](data/Phase_DCT.jpg)|![Modulation](data/Mag_DCT.jpg)|
 
 ### `jpg2gray_filtered`
-![jpg2gray_filter](jpg2gray_filter.gif)
+![jpg2gray_filter](data/jpg2gray_filter.gif)
 
 
 ### Note 
@@ -29,16 +29,16 @@
 
 | algo  | demo  | input size | time |
 |---|---|---|---|
-|  **lucas kanade** |  ![lucaskanade_demo](lucaskanade_demo.gif)   | 160 x 120 |  600ms (+130ms display time)
-| **block matching ARPS** |  ![arps_demo](arps_demo.gif) | 640 x 480 | 130ms (no motion) to 380ms (motion)  (**+2sec display**) with 8x8 MB search 9|
-| **block matching EPZS** | ![epzs_demo](epzs_demo.gif) | 640 x 480 |  150ms to 380ms (**+2sec display**) with 6x6 MB search 9|
+|  **lucas kanade** |  ![lucaskanade_demo](data/lucaskanade_demo.gif)   | 160 x 120 |  600ms (+130ms display time)
+| **block matching ARPS** |  ![arps_demo](data/arps_demo.gif) | 640 x 480 | 130ms (no motion) to 380ms (motion)  (**+2sec display**) with 8x8 MB search 9|
+| **block matching EPZS** | ![epzs_demo](data/epzs_demo.gif) | 640 x 480 |  150ms to 380ms (**+2sec display**) with 6x6 MB search 9|
 
 Note : Block matching takes longer to display (2sec per frame) because of upscaling to input image size for a nicer display. That's why we see so much latency.
 
 
 ## Usage block matching
 
-![details](view-detailed.png)
+![details](data/view-detailed.png)
 
 ## Preparation
 
