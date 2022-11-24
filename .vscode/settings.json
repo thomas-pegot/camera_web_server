@@ -68,7 +68,8 @@
         "ios": "c",
         "locale": "c",
         "queue": "c",
-        "cstdbool": "c"
+        "cstdbool": "c",
+        "stdbool.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false,
     "idf.adapterTargetName": "esp32",

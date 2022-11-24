@@ -7,14 +7,24 @@
   - `jpgd.h` can handle new features, at the moment : 
     -   `jpg2gray` : convert directly during decoding to monochrome
     -   `jpg2gray_filtered` : during conversion apply a median filter to remove horizontal line artifacts. (cf .gif below)
-    -   TODO : develop a DCT-phase filter which can be usefull for motion detection
-    -   TODO : develop a DCT based denoiser, deblocker
+    -   developped a DCT-phase filter which can be usefull for motion detection
+    -   developped a DCT based denoiser
   -   Removed upscaling (too slow)
   -   GUI added a test "Motion Algorithm" which is just the capture converted to gray. It show the decoder latency and the effect of artifacts filtering.   
 
+
+### Phase/Magnitude DCT
+|gray| Phase |Magnitude |
+|---|---|---|
+|![gray](gray.jpg)|![Phase DCT](Phase%20DCT.jpg)|![Modulation](Mag%20DCT.jpg)|
+
+### `jpg2gray_filtered`
 ![jpg2gray_filter](jpg2gray_filter.gif)
 
 
+### Note 
+ - DCT denoiser can be enable/disable in `tjpgdcnf.h` under `DCT_FILTER`
+ - DCT phase and modulation can be enable/disable in `tjpgdcnf.h` under `PHASE_DCT`
 ## Old Results
 
 | algo  | demo  | input size | time |
