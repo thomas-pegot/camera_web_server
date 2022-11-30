@@ -27,12 +27,15 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_heap_caps.h" 
+#include "esp_heap_trace.h"
 
 void app_main()
 {
     // in setup()
     //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
-
     app_wifi_main();
     app_camera_main();
     app_httpd_main();

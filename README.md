@@ -1,5 +1,20 @@
 # Camera webserver with motion
 
+## On going Changes
+
+DCT-sign based feature extraction and DCT-sign based motion detection
+|DCT-based feature| DCT-based motion (motion - background)|
+|---|---|
+|![feature](data/feature_DCT.gif)|![motion](data/motion_DCT.gif)|
+|`#define PHASE_DCT 2` |`#define PHASE_DCT 3`|
+Interpretation: There is no differences. Features (edges) in static object shouldn't be displayed because a SAD(current image, background image) is done. We coul consider it's due to noise but there is pretty much no blinking.
+
+TODO: make it generic and nicer code (diff 1/5)
+
+TODO: Try a time window moving average and put in a buffer previous images. Then perform the same operation on the average. Or find better solution... (difficulty 3/5)
+
+TODO: For optimization don't decode completely but instead reencode just after dct encoding. (difficulty 6/5)
+
 ## Changes
 - esp32motion : enhanced EPZS algorithm accuracy. Now it is possible to choose FFMPEG or MPEG4_AVC version by changing `FFMPEG` value in `esp32-motion/epsz.c` 
 - added JPEG decoder :
@@ -14,6 +29,7 @@
 
 
 ### Phase/Magnitude DCT
+DCT Sign-Only Correlation with Application to Image Matching and the Relationship with Phase-Only Correlation ([DOI:10.1109/ICASSP.2007.366138](https://www.researchgate.net/publication/224711136_DCT_Sign-Only_Correlation_with_Application_to_Image_Matching_and_the_Relationship_with_Phase-Only_Correlation))
 |gray| Phase |Magnitude |
 |---|---|---|
 |![gray](data/gray.jpg)|![Phase DCT](data/Phase_DCT.jpg)|![Modulation](data/Mag_DCT.jpg)|

@@ -440,7 +440,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     ESP_LOGE(TAG, "fmt2jpg failed");
                 esp_camera_fb_return(fb); fb = NULL;
 #if CONFIG_ESP_FACE_DETECT_ENABLED
-            }else if( wdt_safety_cnt > duration - 1 ) {
+            }else if( wdt_safety_cnt >  duration - 1 ) {
                 // Trick to avoid triggering watchdog but need to change in futur
                 (wdt_safety_cnt > duration + 10) ? wdt_safety_cnt = 0 : wdt_safety_cnt++;
                 _jpg_buf_len = fb->len;

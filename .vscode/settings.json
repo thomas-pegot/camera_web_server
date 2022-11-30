@@ -69,7 +69,11 @@
         "locale": "c",
         "queue": "c",
         "cstdbool": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "esp_heap_caps.h": "c",
+        "esp_heap_task_info.h": "c",
+        "rtc_cntl_reg.h": "c",
+        "task.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false,
     "idf.adapterTargetName": "esp32",
