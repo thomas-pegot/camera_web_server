@@ -7,6 +7,8 @@ DCT-sign based feature extraction and DCT-sign based motion detection
 |---|---|
 |![feature](data/feature_DCT.gif)|![motion](data/motion_DCT.gif)|
 |`#define PHASE_DCT 2` |`#define PHASE_DCT 3`|
+
+
 Interpretation: There is no differences. Features (edges) in static object shouldn't be displayed because a SAD(current image, background image) is done. We coul consider it's due to noise but there is pretty much no blinking.
 
 TODO: make it generic and nicer code (diff 1/5)
