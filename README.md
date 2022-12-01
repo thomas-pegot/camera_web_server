@@ -2,12 +2,14 @@
 
 ## On going Changes
 
-DCT-sign based feature extraction and DCT-sign based motion detection
-|DCT-based feature| DCT-based motion (motion - background)|
-|---|---|
-|![feature](data/feature_DCT.gif)|![motion](data/motion_DCT.gif)|
-|`#define PHASE_DCT 2` |`#define PHASE_DCT 3`|
+DCT Sign-Only Correlation with Application to Image Matching and the Relationship with Phase-Only Correlation ([DOI:10.1109/ICASSP.2007.366138](https://www.researchgate.net/publication/224711136_DCT_Sign-Only_Correlation_with_Application_to_Image_Matching_and_the_Relationship_with_Phase-Only_Correlation))
+| |Phase| Motion |
+|---|---|---|
+| `AC_OPTIM 0`|![phase](data/phase.gif) | ![motion](data/motion.gif)|
+| `AC_OPTIM 1`|![o_phase](data/optim_phase.gif) | ![o_motion](data/optim_motion.gif)|
+| | `PHASE_DCT 1` |`PHASE_DCT 2` or `3`|
 
+We can see that `AC_OPTIM`,which is a macro allowing to remove the optimsation around removing IDCT process when there is no DC component in DCT, affects a lot the Phase DCT overall. Or more exactly this optimisation doesn't allow to see the Phase DCT anymore.
 
 Interpretation: There is no differences. Features (edges) in static object shouldn't be displayed because a SAD(current image, background image) is done. We coul consider it's due to noise but there is pretty much no blinking.
 
@@ -28,13 +30,6 @@ TODO: For optimization don't decode completely but instead reencode just after d
     -   developped a DCT based denoiser
   -   Removed upscaling (too slow)
   -   GUI added a test "Motion Algorithm" which is just the capture converted to gray. It shows the decoder latency and the effect of artifacts filtering.   
-
-
-### Phase/Magnitude DCT
-DCT Sign-Only Correlation with Application to Image Matching and the Relationship with Phase-Only Correlation ([DOI:10.1109/ICASSP.2007.366138](https://www.researchgate.net/publication/224711136_DCT_Sign-Only_Correlation_with_Application_to_Image_Matching_and_the_Relationship_with_Phase-Only_Correlation))
-|gray| Phase |Magnitude |
-|---|---|---|
-|![gray](data/gray.jpg)|![Phase DCT](data/Phase_DCT.jpg)|![Modulation](data/Mag_DCT.jpg)|
 
 ### `jpg2gray_filtered`
 ![jpg2gray_filter](data/jpg2gray_filter.gif)
