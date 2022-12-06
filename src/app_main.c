@@ -27,10 +27,6 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_heap_caps.h" 
-#include "esp_heap_trace.h"
 
 void app_main()
 {

@@ -3,21 +3,29 @@
 ## On going Changes
 
 DCT Sign-Only Correlation with Application to Image Matching and the Relationship with Phase-Only Correlation ([DOI:10.1109/ICASSP.2007.366138](https://www.researchgate.net/publication/224711136_DCT_Sign-Only_Correlation_with_Application_to_Image_Matching_and_the_Relationship_with_Phase-Only_Correlation))
-| |Phase| Motion |
-|---|---|---|
-| `AC_OPTIM 0`|![phase](data/phase.gif) | ![motion](data/motion.gif)|
-| `AC_OPTIM 1`|![o_phase](data/optim_phase.gif) | ![o_motion](data/optim_motion.gif)|
-| | `PHASE_DCT 1` |`PHASE_DCT 2` or `3`|
 
-We can see that `AC_OPTIM`,which is a macro allowing to remove the optimsation around removing IDCT process when there is no DC component in DCT, affects a lot the Phase DCT overall. Or more exactly this optimisation doesn't allow to see the Phase DCT anymore.
+Configuration : 
+```c
+#define DCT_FILTER 0
+#define AC_OPTIM 0
+#define PHASE_DCT 1
+```
 
-Interpretation: There is no differences. Features (edges) in static object shouldn't be displayed because a SAD(current image, background image) is done. We coul consider it's due to noise but there is pretty much no blinking.
+|Motion without output| Motion with output |
+|---|---|
+|![phase](data/motion_b.gif) | ![motion](data/motion.gif)|
+|`#define PHASE_DCT 3`|`#define PHASE_DCT 2`|
+Interpretion: Motion are created from the DC component only so we can't capture motion where there is edges already. The advantage though is that you don't have those horizontal lines interfering. Atm I can't fix the issue related of background edges interfering the motion.
 
-TODO: make it generic and nicer code (diff 1/5)
 
-TODO: Try a time window moving average and put in a buffer previous images. Then perform the same operation on the average. Or find better solution... (difficulty 3/5)
+|DCT-sign DC + All AC| DCT-sign DC only |
+|---|---|
+|![phase](data/DCT-sign_DCplusAC.gif) | ![motion](data/DCT-sign_DConly.gif)|
+|`#define PHASE_DCT 1`|`#define PHASE_DCT 1` + manual changes|
+|Edges of objects are more detailed because we have all frequencies.|Horizontal line artifacts disappear. But loose edges details.|
 
-TODO: For optimization don't decode completely but instead reencode just after dct encoding. (difficulty 6/5)
+Interpretation: The process of returning moving object is done by differentating the background (DCT-sign DC only) from the current image (DCT-sign DC only). However since the background DC are the same values as the moving object, the differentiate would be 0 and therefore won't considerate as moving object. Atm I can't find any solution to fix this.
+
 
 ## Changes
 - esp32motion : enhanced EPZS algorithm accuracy. Now it is possible to choose FFMPEG or MPEG4_AVC version by changing `FFMPEG` value in `esp32-motion/epsz.c` 
