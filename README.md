@@ -15,7 +15,8 @@ Configuration :
 |---|---|
 |![phase](data/motion_b.gif) | ![motion](data/motion.gif)|
 |`#define PHASE_DCT 3`|`#define PHASE_DCT 2`|
-Interpretion: Motion are created from the DC component only so we can't capture motion where there is edges already. The advantage though is that you don't have those horizontal lines interfering. Atm I can't fix the issue related of background edges interfering the motion.
+
+**Interpretation**: Motion are created from the DC component only so we can't capture motion where there is edges already. The advantage though is that you don't have those horizontal lines interfering. Atm I can't fix the issue related of background edges interfering the motion.
 
 
 |DCT-sign DC + All AC| DCT-sign DC only |
@@ -24,7 +25,7 @@ Interpretion: Motion are created from the DC component only so we can't capture 
 |`#define PHASE_DCT 1`|`#define PHASE_DCT 1` + manual changes|
 |Edges of objects are more detailed because we have all frequencies.|Horizontal line artifacts disappear. But loose edges details.|
 
-Interpretation: The process of returning moving object is done by differentating the background (DCT-sign DC only) from the current image (DCT-sign DC only). However since the background DC are the same values as the moving object, the differentiate would be 0 and therefore won't considerate as moving object. Atm I can't find any solution to fix this.
+**Interpretation**: The process of returning moving object is done by differentating the background (DCT-sign DC only) from the current image (DCT-sign DC only). However since the background DC are the same values as the moving object, the differentiate would be 0 and therefore won't considerate as moving object. Atm I can't find any solution to fix this.
 
 
 ## Changes
