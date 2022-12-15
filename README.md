@@ -4,9 +4,13 @@
 
 DCT Sign-Only Correlation with Application to Image Matching and the Relationship with Phase-Only Correlation ([DOI:10.1109/ICASSP.2007.366138](https://www.researchgate.net/publication/224711136_DCT_Sign-Only_Correlation_with_Application_to_Image_Matching_and_the_Relationship_with_Phase-Only_Correlation))
 
+Last version:
+![motion_last](data/motion_last.gif)
+
+
+
 Configuration : 
 ```c
-#define DCT_FILTER 0
 #define AC_OPTIM 0
 #define PHASE_DCT 1
 ```
